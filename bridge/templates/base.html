@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Bridge</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = { darkMode: 'class' };
+      (function() {
+        const theme = localStorage.getItem('theme');
+        if (theme === 'dark' || (!theme && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+          document.documentElement.classList.add('dark');
+        }
+      })();
+    </script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+      html { font-family: 'Inter', system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, sans-serif; }
+      /* Make default Django-rendered fields look decent */
+      input, select, textarea { border: 1px solid #e5e7eb; background-color: #ffffff; color: #111827; border-radius: 0.5rem; padding: 0.5rem 0.75rem; width: 100%; }
+      .dark input, .dark select, .dark textarea { border-color: #374151; background-color: #111827; color: #e5e7eb; }
+      button { border-radius: 0.5rem; padding: 0.5rem 0.75rem; }
+      label { font-size: 0.875rem; color: #374151; }
+      .dark label { color: #d1d5db; }
+    </style>
+</head>
+<body class="h-full bg-gray-50 text-gray-900 dark:bg-gray-900 dark:text-gray-100">
+  <header class="border-b border-gray-200 dark:border-gray-800 bg-white/80 dark:bg-gray-900/60 backdrop-blur sticky top-0 z-40">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="h-16 flex items-center justify-between">
+        <a href="/" class="flex items-center gap-2 font-semibold text-lg">
+          <span class="inline-flex h-7 w-7 items-center justify-center rounded bg-indigo-600 text-white font-bold">B</span>
+          <span>Bridge</span>
+        </a>
+        <nav class="hidden md:flex items-center gap-6">
+          <a href="/jobs/" class="hover:text-indigo-600">Jobs</a>
+          <a href="/accounts/profile/edit/" class="hover:text-indigo-600">My Profile</a>
+          {% if request.user.is_authenticated %}
+            <a href="/applications/my/" class="hover:text-indigo-600">My Applications</a>
+            {% if request.user.is_staff %}
+              <a href="/applications/recruiter/" class="hover:text-indigo-600">Applicants</a>
+            {% endif %}
+          {% endif %}
+        </nav>
+        <div class="flex items-center gap-2">
+          <button id="themeToggle" class="inline-flex items-center justify-center rounded-md border border-gray-300 dark:border-gray-700 px-3 py-1.5 text-sm hover:bg-gray-100 dark:hover:bg-gray-800" title="Toggle theme">🌓</button>
+          {% if request.user.is_authenticated %}
+            <form action="/logout/" method="post" class="m-0 p-0">
+              {% csrf_token %}
+              <button type="submit" class="inline-flex items-center justify-center rounded-md bg-gray-900 text-white dark:bg-white dark:text-gray-900 px-3 py-1.5 text-sm hover:opacity-90">Logout</button>
+            </form>
+          {% else %}
+          <a href="/login/" class="inline-flex items-center justify-center rounded-md bg-indigo-600 text-white px-3 py-1.5 text-sm hover:bg-indigo-500">Login</a>
+          <a href="/accounts/signup/" class="inline-flex items-center justify-center rounded-md border border-gray-300 dark:border-gray-700 px-3 py-1.5 text-sm">Sign up</a>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    {% if messages %}
+      <div class="space-y-2 mb-6">
+        {% for message in messages %}
+          <div class="rounded-md border px-4 py-2 text-sm {{ message.tags }} border-gray-300 dark:border-gray-700">{{ message }}</div>
+        {% endfor %}
+      </div>
+    {% endif %}
+    {% block content %}{% endblock %}
+  </main>
+
+  <footer class="border-t border-gray-200 dark:border-gray-800 py-8 mt-12">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-sm text-gray-500 dark:text-gray-400">© {{ now|date:"Y" }} Bridge</div>
+  </footer>
+
+  <script>
+    document.getElementById('themeToggle')?.addEventListener('click', function() {
+      const isDark = document.documentElement.classList.toggle('dark');
+      localStorage.setItem('theme', isDark ? 'dark' : 'light');
+    });
+  </script>
+</body>
+</html>
+
+

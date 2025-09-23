@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="flex items-center justify-between mb-6">
+  <h1 class="text-2xl font-semibold">Applicants to my jobs</h1>
+  <form method="get" class="flex items-center gap-2">
+    <select name="job" class="min-w-[240px]">
+      <option value="">All jobs</option>
+      {% for j in posted_jobs %}
+        <option value="{{ j.id }}" {% if current_job == j.id %}selected{% endif %}>{{ j.title }} @ {{ j.company }}</option>
+      {% endfor %}
+    </select>
+    <select name="status">
+      <option value="">Any status</option>
+      {% for key,label in statuses %}
+        <option value="{{ key }}" {% if current_status == key %}selected{% endif %}>{{ label }}</option>
+      {% endfor %}
+    </select>
+    <button class="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-500">Filter</button>
+  </form>
+</div>
+
+<div class="space-y-6">
+  {% for item in grouped %}
+  <section class="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-800 rounded-xl p-4">
+    <div class="flex items-center justify-between mb-2">
+      <div>
+        <div class="text-lg font-semibold">{{ item.job.title }}</div>
+        <div class="text-sm text-gray-500">{{ item.job.company }}</div>
+      </div>
+      <span class="text-xs rounded-full px-2 py-1 border border-gray-300 dark:border-gray-700">{{ item.job.get_work_type_display }}</span>
+    </div>
+    <div class="grid grid-cols-1 md:grid-cols-5 gap-4">
+      {% for group in item.status_groups %}
+      <div>
+        <h3 class="font-medium text-sm text-gray-600 dark:text-gray-300 mb-2">{{ group.label }}</h3>
+        <div class="space-y-2">
+          {% for app in group.apps %}
+            <div class="rounded-lg border border-gray-200 dark:border-gray-700 p-3">
+              <div class="text-sm font-medium">{{ app.applicant.username }}</div>
+              <div class="text-xs text-gray-500">{{ app.applicant.email }}</div>
+              {% if app.note %}<div class="text-xs text-gray-400 mt-1 line-clamp-2">“{{ app.note }}”</div>{% endif %}
+              <div class="text-xs text-gray-400 mt-2">Updated {{ app.updated_at }}</div>
+            </div>
+          {% empty %}
+            <div class="text-xs text-gray-400">None</div>
+          {% endfor %}
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </section>
+  {% empty %}
+    <div class="text-gray-500">No applications to your jobs yet.</div>
+  {% endfor %}
+</div>
+{% endblock %}
+
+

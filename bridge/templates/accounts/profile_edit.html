@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+  <section class="lg:col-span-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-800 rounded-xl p-6">
+    <h1 class="text-2xl font-semibold mb-4">Edit profile</h1>
+    <form method="post" class="space-y-4">
+      {% csrf_token %}
+      {{ form.as_p }}
+      <button type="submit" class="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-500">Save</button>
+    </form>
+  </section>
+  <aside class="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-800 rounded-xl p-6 h-fit">
+    <h2 class="font-medium mb-2">Tips</h2>
+    <ul class="list-disc list-inside text-sm text-gray-600 dark:text-gray-300 space-y-1">
+      <li>Keep your headline concise and impactful.</li>
+      <li>Add links to showcase your work.</li>
+      <li>Use visibility to control who can see your profile.</li>
+    </ul>
+  </aside>
+</div>
+{% endblock %}
+
+

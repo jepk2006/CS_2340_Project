@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="max-w-lg mx-auto bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-800 rounded-xl p-6">
+  <h1 class="text-xl font-semibold mb-4">Create your account</h1>
+  <form method="post" class="space-y-4">
+    {% csrf_token %}
+    <div class="grid grid-cols-1 gap-4">
+      <div>
+        <label class="block mb-1">Username</label>
+        {{ form.username }}
+      </div>
+      <div>
+        <label class="block mb-1">Email (optional)</label>
+        {{ form.email }}
+      </div>
+      <div>
+        <label class="block mb-1">Password</label>
+        {{ form.password }}
+      </div>
+      <div>
+        <label class="block mb-1">Account type</label>
+        {{ form.account_type }}
+      </div>
+    </div>
+    <button class="w-full bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-500">Sign up</button>
+  </form>
+  <p class="text-sm text-gray-500 mt-3">Already have an account? <a href="/login/" class="text-indigo-600">Log in</a></p>
+</div>
+{% endblock %}
+
+

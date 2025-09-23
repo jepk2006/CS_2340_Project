@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+  <section class="lg:col-span-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-800 rounded-xl p-6">
+    <div class="flex items-start justify-between">
+      <div>
+        <h1 class="text-2xl font-semibold">{{ job.title }}</h1>
+        <div class="text-gray-500">{{ job.company }}</div>
+      </div>
+      <span class="text-xs rounded-full px-2 py-1 border border-gray-300 dark:border-gray-700">{{ job.get_work_type_display }}</span>
+    </div>
+    <div class="mt-2 text-sm text-gray-500">{{ job.location_city }} {{ job.location_state }} {{ job.location_country }}</div>
+    <div class="prose dark:prose-invert max-w-none mt-4">{{ job.description }}</div>
+    <div class="mt-4 flex flex-wrap gap-2">
+      {% for s in job.skills.all %}
+        <span class="text-xs bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 px-2 py-1 rounded">{{ s.name }}</span>
+      {% empty %}
+        <span class="text-xs text-gray-400">No skills listed</span>
+      {% endfor %}
+    </div>
+  </section>
+  <aside class="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-800 rounded-xl p-6 h-fit">
+    <div class="text-sm text-gray-600 dark:text-gray-300 space-y-2">
+      <div><span class="text-gray-400">Salary:</span> {% if job.min_salary %}${{ job.min_salary }}{% endif %}{% if job.max_salary %} - ${{ job.max_salary }}{% endif %}</div>
+      <div><span class="text-gray-400">Visa:</span> {{ job.visa_sponsorship|yesno:"Yes,No" }}</div>
+    </div>
+    <div class="mt-4">
+      {% if request.user.is_authenticated %}
+      <form action="{% url 'jobs:apply_one_click' job.pk %}" method="post" class="space-y-2">
+        {% csrf_token %}
+        <label class="block text-sm">Personalized note</label>
+        <textarea name="note" class="min-h-[100px]"></textarea>
+        <button type="submit" class="w-full bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-500">One‑click Apply</button>
+      </form>
+      {% else %}
+        <a class="w-full inline-flex items-center justify-center bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-500" href="/login/?next={{ request.path }}">Login to apply</a>
+      {% endif %}
+    </div>
+  </aside>
+</div>
+{% endblock %}
+
+
