@@ -1,7 +1,8 @@
 from django.contrib.auth.decorators import login_required
-from django.shortcuts import render
+from django.shortcuts import render, get_object_or_404, redirect
 
 from .models import Application
+from accounts.models import JobSeekerProfile
 
 
 @login_required
@@ -18,16 +19,31 @@ def my_applications(request):
         {"key": key, "label": label, "apps": grouped.get(key, [])}
         for key, label in Application.Status.choices
     ]
+
+    recommended_jobs = []
+    if hasattr(request.user, 'jobseeker_profile'):
+        recommended_jobs = request.user.jobseeker_profile.get_recommended_jobs()[:5] # Limit to 5 recommended jobs
+
     return render(
         request,
         "applications/my_applications.html",
-        {"status_groups": status_groups},
+        {"status_groups": status_groups, "recommended_jobs": recommended_jobs},
     )
 
 
 @login_required
 def recruiter_applications(request):
-    # Optional filters
+    # Handle status updates
+    if request.method == "POST":
+        application_id = request.POST.get("application_id")
+        new_status = request.POST.get("status")
+        if application_id and new_status:
+            application = get_object_or_404(Application, pk=application_id, job__posted_by=request.user)
+            application.status = new_status
+            application.save()
+            return redirect("applications:recruiter_applications")
+
+    # Optional filters (GET request handling)
     job_id = request.GET.get("job")
     status = request.GET.get("status")
 

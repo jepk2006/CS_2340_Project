@@ -1,5 +1,6 @@
 from django.db import models
 from django.contrib.auth import get_user_model
+from jobs.models import Skill, Job
 
 
 class JobSeekerProfile(models.Model):
@@ -44,5 +45,18 @@ class JobSeekerProfile(models.Model):
 
     def __str__(self):
         return f"Profile({self.user.username})"
+
+    def get_recommended_jobs(self):
+        # Get the skills associated with the job seeker's profile
+        seeker_skills = self.skills.all()
+
+        # If the job seeker has no skills, return an empty queryset
+        if not seeker_skills:
+            return Job.objects.none()
+
+        # Get all jobs that have at least one matching skill
+        recommended_jobs = Job.objects.filter(skills__in=seeker_skills).distinct()
+
+        return recommended_jobs
 
 # Create your models here.
