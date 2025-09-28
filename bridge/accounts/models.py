@@ -30,6 +30,7 @@ class JobSeekerProfile(models.Model):
     location_country = models.CharField(max_length=100, blank=True)
     latitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
     longitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
+    commute_radius = models.PositiveIntegerField(null=True, blank=True, help_text="Preferred commute radius in miles")
 
     # Skills (referencing jobs.Skill by app label to avoid circular import)
     skills = models.ManyToManyField("jobs.Skill", blank=True, related_name="profiles")

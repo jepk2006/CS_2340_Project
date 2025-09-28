@@ -22,6 +22,7 @@ class JobSeekerProfileForm(ModelForm):
             "location_country",
             "latitude",
             "longitude",
+            "commute_radius",
             "skills",
             "visibility",
             "show_email",
