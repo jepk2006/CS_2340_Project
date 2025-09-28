@@ -153,6 +153,16 @@
     </div>
 
     <div id="jobMapContainer" class="hidden">
+      <div class="mb-3 flex flex-col md:flex-row md:items-center gap-2">
+        <div class="flex items-center gap-2">
+          <label for="distanceMilesInput" class="text-sm">Max distance (miles)</label>
+          <input id="distanceMilesInput" type="number" min="1" step="1" placeholder="e.g. 25" class="w-24" />
+        </div>
+        <div class="flex items-center gap-2">
+          <button id="useLocationBtn" type="button" class="px-3 py-1.5 rounded border border-gray-300 dark:border-gray-700">Use My Location</button>
+          <button id="applyDistanceBtn" type="button" class="px-3 py-1.5 rounded bg-indigo-600 text-white">Apply Distance</button>
+        </div>
+      </div>
       <div id="jobMap" class="h-96 rounded-xl overflow-hidden border border-gray-200 dark:border-gray-800"></div>
     </div>
 
@@ -193,6 +203,13 @@
       let mapInstance = null;
       let markersLayer = null;
       let hasLoaded = false;
+      let userLat = null;
+      let userLon = null;
+      let distanceMiles = null;
+
+      const distanceInput = document.getElementById('distanceMilesInput');
+      const useLocationBtn = document.getElementById('useLocationBtn');
+      const applyDistanceBtn = document.getElementById('applyDistanceBtn');
 
       if (!listToggle || !mapToggle || !jobListSection || !mapContainer) {
         return;
@@ -230,12 +247,24 @@
         }
       }
 
-      function initializeMap() {
+      function getMapUrl() {
         const url = new URL(window.location.origin + '/jobs/map-data/');
         const params = new URLSearchParams(window.location.search);
         params.forEach((value, key) => url.searchParams.append(key, value));
+        if (userLat != null && userLon != null) {
+          url.searchParams.set('user_lat', String(userLat));
+          url.searchParams.set('user_lon', String(userLon));
+        }
+        const rawMiles = distanceInput?.value || '';
+        const miles = rawMiles ? parseFloat(rawMiles) : distanceMiles;
+        if (miles && !Number.isNaN(miles) && miles > 0) {
+          url.searchParams.set('max_distance', String(miles));
+        }
+        return url.toString();
+      }
 
-        fetch(url.toString())
+      function initializeMap() {
+        fetch(getMapUrl())
           .then((response) => {
             if (!response.ok) {
               throw new Error('Failed to load map data');
@@ -314,6 +343,118 @@
             mapStatus.textContent = 'There was an error loading the map view. Please try again later.';
             mapStatus.classList.remove('hidden');
           });
+      }
+
+      function updateMapData() {
+        if (!mapInstance) {
+          initializeMap();
+          return;
+        }
+        fetch(getMapUrl())
+          .then((response) => {
+            if (!response.ok) throw new Error('Failed to load map data');
+            return response.json();
+          })
+          .then((data) => {
+            if (markersLayer) {
+              markersLayer.clearLayers();
+            } else {
+              markersLayer = L.layerGroup().addTo(mapInstance);
+            }
+
+            const bounds = [];
+            data.results.forEach((job) => {
+              const marker = L.marker([job.latitude, job.longitude]).bindPopup(
+                `<div class="space-y-1">
+                  <div class="font-semibold">${job.title}</div>
+                  <div class="text-sm text-gray-600">${job.company}</div>
+                  ${job.location ? `<div class="text-xs text-gray-500">${job.location}</div>` : ''}
+                  ${job.distance_miles ? `<div class="text-xs text-indigo-600">${job.distance_miles} miles away</div>` : ''}
+                  ${job.salary_range ? `<div class="text-xs text-gray-500">${job.salary_range}</div>` : ''}
+                  <a href="${job.detail_url}" class="text-indigo-600 text-xs font-medium">View details</a>
+                </div>`
+              );
+              marker.addTo(markersLayer);
+              bounds.push([job.latitude, job.longitude]);
+            });
+
+            if (data.user_location) {
+              const userMarker = L.circleMarker([
+                data.user_location.latitude,
+                data.user_location.longitude,
+              ], {
+                color: '#4f46e5',
+                radius: 8,
+                fillOpacity: 0.7,
+              }).bindPopup('Your location');
+              userMarker.addTo(markersLayer);
+              bounds.push([data.user_location.latitude, data.user_location.longitude]);
+            }
+
+            if (bounds.length) {
+              mapInstance.fitBounds(bounds, { padding: [30, 30] });
+            }
+
+            if (data.missing_count > 0) {
+              mapStatus.textContent = `${data.missing_count} job${data.missing_count === 1 ? '' : 's'} missing map coordinates were excluded.`;
+              mapStatus.classList.remove('hidden');
+            } else {
+              mapStatus.classList.add('hidden');
+            }
+
+            if (!data.results.length) {
+              mapStatus.textContent = 'No jobs with map coordinates match your filters.';
+              mapStatus.classList.remove('hidden');
+            }
+          })
+          .catch((error) => {
+            console.error(error);
+            mapStatus.textContent = 'There was an error loading the map view. Please try again later.';
+            mapStatus.classList.remove('hidden');
+          });
+      }
+
+      // Prefill from URL if present
+      (function prefillDistanceFromQuery() {
+        const params = new URLSearchParams(window.location.search);
+        const existing = params.get('max_distance');
+        if (existing && distanceInput) {
+          distanceInput.value = existing;
+        }
+      })();
+
+      if (useLocationBtn) {
+        useLocationBtn.addEventListener('click', () => {
+          if (!navigator.geolocation) {
+            mapStatus.textContent = 'Geolocation is not supported by your browser.';
+            mapStatus.classList.remove('hidden');
+            return;
+          }
+          navigator.geolocation.getCurrentPosition(
+            (pos) => {
+              userLat = pos.coords.latitude;
+              userLon = pos.coords.longitude;
+              mapStatus.textContent = 'Location set.';
+              mapStatus.classList.remove('hidden');
+              updateMapData();
+            },
+            (err) => {
+              console.error(err);
+              mapStatus.textContent = 'Could not get your location. Please allow access and try again.';
+              mapStatus.classList.remove('hidden');
+            },
+            { enableHighAccuracy: true, timeout: 8000 }
+          );
+        });
+      }
+
+      if (applyDistanceBtn) {
+        applyDistanceBtn.addEventListener('click', () => {
+          const raw = distanceInput?.value || '';
+          const miles = raw ? parseFloat(raw) : null;
+          distanceMiles = miles && !Number.isNaN(miles) && miles > 0 ? miles : null;
+          updateMapData();
+        });
       }
 
       listToggle.addEventListener('click', showListView);

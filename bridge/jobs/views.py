@@ -158,15 +158,67 @@ def apply_one_click(request, pk):
 
 def job_map_data(request):
     filterset = JobFilter(request.GET, queryset=Job.objects.all())
-    queryset = apply_commute_radius_filter(filterset.qs, request.user)
-    jobs = list(queryset)
+    qs = filterset.qs
+
+    # Optional map-specific filtering via query params
+    lat_param = request.GET.get("user_lat")
+    lon_param = request.GET.get("user_lon")
+    max_dist_param = request.GET.get("max_distance")
 
     profile = _get_jobseeker_profile(request.user)
+
+    user_lat = None
+    user_lon = None
+    distance_limit = None
+
+    # Prefer explicit query params if provided
+    try:
+        if lat_param is not None and lon_param is not None:
+            user_lat = float(lat_param)
+            user_lon = float(lon_param)
+    except (TypeError, ValueError):
+        user_lat = None
+        user_lon = None
+
+    if max_dist_param:
+        try:
+            distance_limit = float(max_dist_param)
+        except (TypeError, ValueError):
+            distance_limit = None
+
+    # Fallback to saved profile location / commute radius if not provided
+    if (user_lat is None or user_lon is None) and profile and profile.latitude and profile.longitude:
+        user_lat = float(profile.latitude)
+        user_lon = float(profile.longitude)
+
+    if distance_limit is None and profile and profile.commute_radius:
+        distance_limit = float(profile.commute_radius)
+
+    # Apply distance filter only if we have both a location and a distance
+    if user_lat is not None and user_lon is not None and distance_limit:
+        pks_within = []
+        for job in qs:
+            if job.latitude and job.longitude:
+                d = calculate_distance(
+                    user_lat,
+                    user_lon,
+                    float(job.latitude),
+                    float(job.longitude),
+                )
+                if d is not None and d <= distance_limit:
+                    pks_within.append(job.pk)
+        if pks_within:
+            qs = qs.filter(pk__in=pks_within)
+        else:
+            qs = qs.none()
+
+    jobs = list(qs)
+
     user_location = None
-    if profile and profile.latitude and profile.longitude:
+    if user_lat is not None and user_lon is not None:
         user_location = {
-            "latitude": float(profile.latitude),
-            "longitude": float(profile.longitude),
+            "latitude": float(user_lat),
+            "longitude": float(user_lon),
         }
 
     results = []
