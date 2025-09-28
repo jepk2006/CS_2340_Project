@@ -166,14 +166,27 @@
     </div>
 
     <div id="jobMapContainer" class="hidden">
-      <div class="mb-3 flex flex-col md:flex-row md:items-center gap-2">
-        <div class="flex items-center gap-2">
-          <label for="distanceMilesInput" class="text-sm">Max distance (miles)</label>
-          <input id="distanceMilesInput" type="number" min="1" step="1" placeholder="e.g. 25" class="w-24" />
+      <div class="mb-3 space-y-2">
+        <div class="flex flex-col md:flex-row md:items-center gap-2">
+          <div class="flex items-center gap-2">
+            <label for="distanceMilesInput" class="text-sm">Max distance (miles)</label>
+            <input id="distanceMilesInput" type="number" min="1" step="1" placeholder="e.g. 25" class="w-24" />
+          </div>
+          <div class="flex items-center gap-2">
+            <button id="useLocationBtn" type="button" class="px-3 py-1.5 rounded border border-gray-300 dark:border-gray-700">Use My Location</button>
+            <button id="applyDistanceBtn" type="button" class="px-3 py-1.5 rounded bg-indigo-600 text-white">Apply Distance</button>
+          </div>
         </div>
-        <div class="flex items-center gap-2">
-          <button id="useLocationBtn" type="button" class="px-3 py-1.5 rounded border border-gray-300 dark:border-gray-700">Use My Location</button>
-          <button id="applyDistanceBtn" type="button" class="px-3 py-1.5 rounded bg-indigo-600 text-white">Apply Distance</button>
+        <div class="flex flex-col md:flex-row md:items-center gap-2">
+          <div class="text-sm text-gray-600 dark:text-gray-400">Or enter coordinates manually:</div>
+          <div class="flex items-center gap-2">
+            <input id="manualLatInput" type="number" step="any" placeholder="33.7490" class="w-28 text-sm" title="Latitude (e.g., 33.7490 for Atlanta)" />
+            <input id="manualLonInput" type="number" step="any" placeholder="-84.3880" class="w-28 text-sm" title="Longitude (e.g., -84.3880 for Atlanta)" />
+            <button id="useManualLocationBtn" type="button" class="px-2 py-1 text-sm rounded border border-gray-300 dark:border-gray-700">Set Location</button>
+          </div>
+        </div>
+        <div class="text-xs text-gray-500 dark:text-gray-400">
+          Examples: Atlanta (33.7490, -84.3880), NYC (40.7128, -74.0060), SF (37.7749, -122.4194)
         </div>
       </div>
       <div id="jobMap" class="h-96 rounded-xl overflow-hidden border border-gray-200 dark:border-gray-800"></div>
@@ -198,17 +211,360 @@
 </div>
 {% endblock %}
 
+{% block extra_scripts %}
+  {{ block.super }}
+  <script
+    src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+    crossorigin=""
+  ></script>
+  <script>
+    (function() {
+      const listToggle = document.querySelector('[data-view-toggle="list"]');
+      const mapToggle = document.querySelector('[data-view-toggle="map"]');
+      const jobListSection = document.getElementById('jobListSection');
+      const paginationControls = document.getElementById('paginationControls');
+      const mapContainer = document.getElementById('jobMapContainer');
+      const mapStatus = document.getElementById('mapStatus');
+      const mapElement = document.getElementById('jobMap');
+      let mapInstance = null;
+      let markersLayer = null;
+      let hasLoaded = false;
+      let userLat = null;
+      let userLon = null;
+      let distanceMiles = null;
 
-{% block extra_head %}
-<style>
-  .job-card {
-    transition: all 0.2s ease-in-out;
-  }
-  .job-card:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
-  }
-</style>
+      const distanceInput = document.getElementById('distanceMilesInput');
+      const useLocationBtn = document.getElementById('useLocationBtn');
+      const applyDistanceBtn = document.getElementById('applyDistanceBtn');
+      const manualLatInput = document.getElementById('manualLatInput');
+      const manualLonInput = document.getElementById('manualLonInput');
+      const useManualLocationBtn = document.getElementById('useManualLocationBtn');
+
+      if (!listToggle || !mapToggle || !jobListSection || !mapContainer) {
+        return;
+      }
+
+      function setActiveButton(activeButton) {
+        [listToggle, mapToggle].forEach((btn) => {
+          if (btn === activeButton) {
+            btn.classList.add('bg-gray-100', 'dark:bg-gray-800');
+          } else {
+            btn.classList.remove('bg-gray-100', 'dark:bg-gray-800');
+          }
+        });
+      }
+
+      function showListView() {
+        setActiveButton(listToggle);
+        jobListSection.classList.remove('hidden');
+        mapContainer.classList.add('hidden');
+        paginationControls?.classList.remove('hidden');
+        mapStatus.classList.add('hidden');
+      }
+
+      function showMapView() {
+        setActiveButton(mapToggle);
+        jobListSection.classList.add('hidden');
+        mapContainer.classList.remove('hidden');
+        paginationControls?.classList.add('hidden');
+        if (!hasLoaded) {
+          initializeMap();
+        } else if (mapInstance) {
+          setTimeout(() => {
+            mapInstance.invalidateSize();
+          }, 0);
+        }
+      }
+
+      function getMapUrl() {
+        const url = new URL(window.location.origin + '/jobs/map-data/');
+        const params = new URLSearchParams(window.location.search);
+        params.forEach((value, key) => url.searchParams.append(key, value));
+        if (userLat != null && userLon != null) {
+          url.searchParams.set('user_lat', String(userLat));
+          url.searchParams.set('user_lon', String(userLon));
+        }
+        const rawMiles = distanceInput?.value || '';
+        const miles = rawMiles ? parseFloat(rawMiles) : distanceMiles;
+        if (miles && !Number.isNaN(miles) && miles > 0) {
+          url.searchParams.set('max_distance', String(miles));
+        }
+        return url.toString();
+      }
+
+      function initializeMap() {
+        fetch(getMapUrl())
+          .then((response) => {
+            if (!response.ok) {
+              throw new Error('Failed to load map data');
+            }
+            return response.json();
+          })
+          .then((data) => {
+            if (!mapInstance) {
+              mapInstance = L.map(mapElement).setView([20, 0], 2);
+              L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                maxZoom: 19,
+                attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+              }).addTo(mapInstance);
+            }
+
+            if (markersLayer) {
+              markersLayer.clearLayers();
+            } else {
+              markersLayer = L.layerGroup().addTo(mapInstance);
+            }
+
+            const bounds = [];
+
+            data.results.forEach((job) => {
+              const marker = L.marker([job.latitude, job.longitude]).bindPopup(
+                `<div class="space-y-1">
+                  <div class="font-semibold">${job.title}</div>
+                  <div class="text-sm text-gray-600">${job.company}</div>
+                  ${job.location ? `<div class="text-xs text-gray-500">${job.location}</div>` : ''}
+                  ${job.distance_miles ? `<div class="text-xs text-indigo-600">${job.distance_miles} miles away</div>` : ''}
+                  ${job.salary_range ? `<div class="text-xs text-gray-500">${job.salary_range}</div>` : ''}
+                  <a href="${job.detail_url}" class="text-indigo-600 text-xs font-medium">View details</a>
+                </div>`
+              );
+              marker.addTo(markersLayer);
+              bounds.push([job.latitude, job.longitude]);
+            });
+
+            if (data.user_location) {
+              const userMarker = L.circleMarker([
+                data.user_location.latitude,
+                data.user_location.longitude,
+              ], {
+                color: '#4f46e5',
+                radius: 8,
+                fillOpacity: 0.7,
+              }).bindPopup('Your location');
+              userMarker.addTo(markersLayer);
+              bounds.push([data.user_location.latitude, data.user_location.longitude]);
+            }
+
+            if (bounds.length) {
+              mapInstance.fitBounds(bounds, { padding: [30, 30] });
+            }
+
+            hasLoaded = true;
+
+            if (data.missing_count > 0) {
+              mapStatus.textContent = `${data.missing_count} job${data.missing_count === 1 ? '' : 's'} missing map coordinates were excluded.`;
+              mapStatus.classList.remove('hidden');
+            } else {
+              mapStatus.classList.add('hidden');
+            }
+
+            if (!data.results.length) {
+              mapStatus.textContent = 'No jobs with map coordinates match your filters.';
+              mapStatus.classList.remove('hidden');
+            }
+
+            setTimeout(() => {
+              mapInstance.invalidateSize();
+            }, 100);
+          })
+          .catch((error) => {
+            console.error(error);
+            mapStatus.textContent = 'There was an error loading the map view. Please try again later.';
+            mapStatus.classList.remove('hidden');
+          });
+      }
+
+      function updateMapData() {
+        if (!mapInstance) {
+          initializeMap();
+          return;
+        }
+        fetch(getMapUrl())
+          .then((response) => {
+            if (!response.ok) throw new Error('Failed to load map data');
+            return response.json();
+          })
+          .then((data) => {
+            if (markersLayer) {
+              markersLayer.clearLayers();
+            } else {
+              markersLayer = L.layerGroup().addTo(mapInstance);
+            }
+
+            const bounds = [];
+            data.results.forEach((job) => {
+              const marker = L.marker([job.latitude, job.longitude]).bindPopup(
+                `<div class="space-y-1">
+                  <div class="font-semibold">${job.title}</div>
+                  <div class="text-sm text-gray-600">${job.company}</div>
+                  ${job.location ? `<div class="text-xs text-gray-500">${job.location}</div>` : ''}
+                  ${job.distance_miles ? `<div class="text-xs text-indigo-600">${job.distance_miles} miles away</div>` : ''}
+                  ${job.salary_range ? `<div class="text-xs text-gray-500">${job.salary_range}</div>` : ''}
+                  <a href="${job.detail_url}" class="text-indigo-600 text-xs font-medium">View details</a>
+                </div>`
+              );
+              marker.addTo(markersLayer);
+              bounds.push([job.latitude, job.longitude]);
+            });
+
+            if (data.user_location) {
+              const userMarker = L.circleMarker([
+                data.user_location.latitude,
+                data.user_location.longitude,
+              ], {
+                color: '#4f46e5',
+                radius: 8,
+                fillOpacity: 0.7,
+              }).bindPopup('Your location');
+              userMarker.addTo(markersLayer);
+              bounds.push([data.user_location.latitude, data.user_location.longitude]);
+            }
+
+            if (bounds.length) {
+              mapInstance.fitBounds(bounds, { padding: [30, 30] });
+            }
+
+            if (data.missing_count > 0) {
+              mapStatus.textContent = `${data.missing_count} job${data.missing_count === 1 ? '' : 's'} missing map coordinates were excluded.`;
+              mapStatus.classList.remove('hidden');
+            } else {
+              mapStatus.classList.add('hidden');
+            }
+
+            if (!data.results.length) {
+              mapStatus.textContent = 'No jobs with map coordinates match your filters.';
+              mapStatus.classList.remove('hidden');
+            }
+          })
+          .catch((error) => {
+            console.error(error);
+            mapStatus.textContent = 'There was an error loading the map view. Please try again later.';
+            mapStatus.classList.remove('hidden');
+          });
+      }
+
+      // Prefill from URL if present
+      (function prefillDistanceFromQuery() {
+        const params = new URLSearchParams(window.location.search);
+        const existing = params.get('max_distance');
+        if (existing && distanceInput) {
+          distanceInput.value = existing;
+        }
+      })();
+
+      if (useLocationBtn) {
+        useLocationBtn.addEventListener('click', () => {
+          if (!navigator.geolocation) {
+            mapStatus.textContent = 'Geolocation is not supported by your browser.';
+            mapStatus.classList.remove('hidden');
+            return;
+          }
+
+          // Show loading state
+          useLocationBtn.disabled = true;
+          useLocationBtn.textContent = 'Getting location...';
+          mapStatus.textContent = 'Requesting your location...';
+          mapStatus.classList.remove('hidden');
+
+          navigator.geolocation.getCurrentPosition(
+            (pos) => {
+              userLat = pos.coords.latitude;
+              userLon = pos.coords.longitude;
+              console.log('Location obtained:', userLat, userLon);
+              
+              // Reset button state
+              useLocationBtn.disabled = false;
+              useLocationBtn.textContent = 'Use My Location';
+              
+              mapStatus.textContent = `Location set: ${userLat.toFixed(4)}, ${userLon.toFixed(4)}`;
+              mapStatus.classList.remove('hidden');
+              
+              // Update map with new location
+              updateMapData();
+            },
+            (err) => {
+              console.error('Geolocation error:', err);
+              
+              // Reset button state
+              useLocationBtn.disabled = false;
+              useLocationBtn.textContent = 'Use My Location';
+              
+              let errorMessage = 'Could not get your location. ';
+              switch(err.code) {
+                case err.PERMISSION_DENIED:
+                  errorMessage += 'Please allow location access in your browser settings and try again.';
+                  break;
+                case err.POSITION_UNAVAILABLE:
+                  errorMessage += 'Location information is unavailable.';
+                  break;
+                case err.TIMEOUT:
+                  errorMessage += 'Location request timed out. Please try again.';
+                  break;
+                default:
+                  errorMessage += 'An unknown error occurred.';
+                  break;
+              }
+              
+              mapStatus.textContent = errorMessage;
+              mapStatus.classList.remove('hidden');
+            },
+            { 
+              enableHighAccuracy: true, 
+              timeout: 15000, 
+              maximumAge: 300000 // 5 minutes
+            }
+          );
+        });
+      }
+
+      if (applyDistanceBtn) {
+        applyDistanceBtn.addEventListener('click', () => {
+          const raw = distanceInput?.value || '';
+          const miles = raw ? parseFloat(raw) : null;
+          distanceMiles = miles && !Number.isNaN(miles) && miles > 0 ? miles : null;
+          updateMapData();
+        });
+      }
+
+      if (useManualLocationBtn) {
+        useManualLocationBtn.addEventListener('click', () => {
+          const lat = parseFloat(manualLatInput?.value || '');
+          const lon = parseFloat(manualLonInput?.value || '');
+          
+          if (isNaN(lat) || isNaN(lon)) {
+            mapStatus.textContent = 'Please enter valid latitude and longitude values.';
+            mapStatus.classList.remove('hidden');
+            return;
+          }
+          
+          if (lat < -90 || lat > 90) {
+            mapStatus.textContent = 'Latitude must be between -90 and 90.';
+            mapStatus.classList.remove('hidden');
+            return;
+          }
+          
+          if (lon < -180 || lon > 180) {
+            mapStatus.textContent = 'Longitude must be between -180 and 180.';
+            mapStatus.classList.remove('hidden');
+            return;
+          }
+          
+          userLat = lat;
+          userLon = lon;
+          console.log('Manual location set:', userLat, userLon);
+          
+          mapStatus.textContent = `Manual location set: ${userLat.toFixed(4)}, ${userLon.toFixed(4)}`;
+          mapStatus.classList.remove('hidden');
+          
+          updateMapData();
+        });
+      }
+
+      listToggle.addEventListener('click', showListView);
+      mapToggle.addEventListener('click', showMapView);
+      showListView();
+    })();
+  </script>
 {% endblock %}
 
 

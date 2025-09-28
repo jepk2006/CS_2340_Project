@@ -151,6 +151,14 @@ class JobDetailView(DetailView):
 @require_POST
 def apply_one_click(request, pk):
     job = get_object_or_404(Job, pk=pk)
+    
+    # Check if user is a recruiter
+    profile = _get_jobseeker_profile(request.user)
+    if profile and profile.account_type == 'recruiter':
+        from django.contrib import messages
+        messages.error(request, "Recruiters cannot apply to jobs.")
+        return redirect("jobs:job_detail", pk=pk)
+    
     note = request.POST.get("note", "")
     application, created = Application.objects.get_or_create(job=job, applicant=request.user, defaults={"note": note})
     if not created and note:
@@ -192,7 +200,7 @@ def job_map_data(request):
 
     # Prefer explicit query params if provided
     try:
-        if lat_param is not None and lon_param is not None:
+        if lat_param and lon_param:
             user_lat = float(lat_param)
             user_lon = float(lon_param)
     except (TypeError, ValueError):

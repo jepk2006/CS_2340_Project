@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% block content %}
 <h1 class="text-2xl font-semibold mb-4">My applications</h1>
+<div id="statusMessage" class="hidden mb-4 p-3 rounded-lg"></div>
 
 {% if recommended_jobs %}
 <section class="mb-6">
@@ -39,22 +40,172 @@
 
 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
   {% for group in status_groups %}
-  <section class="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-800 rounded-xl p-4">
+  <section class="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-800 rounded-xl p-4 drop-zone" data-status="{{ group.key }}">
     <h3 class="font-medium text-gray-700 dark:text-gray-300 mb-2">{{ group.label }}</h3>
-    <div class="space-y-2">
+    <div class="space-y-2 min-h-[100px]" data-status="{{ group.key }}">
     {% for app in group.apps %}
-      <div class="rounded-lg border border-gray-200 dark:border-gray-700 p-3">
+      <div class="rounded-lg border border-gray-200 dark:border-gray-700 p-3 cursor-move application-card" 
+           draggable="true" 
+           data-app-id="{{ app.id }}" 
+           data-current-status="{{ app.status }}">
         <div class="text-sm font-medium">{{ app.job.title }}</div>
         <div class="text-xs text-gray-500">{{ app.job.company }}</div>
         <div class="text-xs text-gray-400 mt-2">Updated {{ app.updated_at }}</div>
       </div>
     {% empty %}
-      <div class="text-sm text-gray-400">None</div>
+      <div class="text-sm text-gray-400 empty-placeholder">None</div>
     {% endfor %}
     </div>
   </section>
   {% endfor %}
  </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const statusMessage = document.getElementById('statusMessage');
+    let draggedElement = null;
+
+    // Get CSRF token
+    function getCookie(name) {
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            const cookies = document.cookie.split(';');
+            for (let i = 0; i < cookies.length; i++) {
+                const cookie = cookies[i].trim();
+                if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
+                }
+            }
+        }
+        return cookieValue;
+    }
+    const csrftoken = getCookie('csrftoken');
+
+    function showMessage(text, isError = false) {
+        statusMessage.textContent = text;
+        statusMessage.className = `mb-4 p-3 rounded-lg ${isError ? 'bg-red-100 text-red-800 border border-red-200' : 'bg-green-100 text-green-800 border border-green-200'}`;
+        statusMessage.classList.remove('hidden');
+        setTimeout(() => {
+            statusMessage.classList.add('hidden');
+        }, 3000);
+    }
+
+    // Add drag event listeners to application cards
+    document.querySelectorAll('.application-card').forEach(card => {
+        card.addEventListener('dragstart', function(e) {
+            draggedElement = this;
+            this.style.opacity = '0.5';
+            console.log('Drag started for:', this.dataset.appId);
+        });
+
+        card.addEventListener('dragend', function(e) {
+            this.style.opacity = '';
+            console.log('Drag ended for:', this.dataset.appId);
+            // Reset draggedElement after a small delay to ensure drop event completes
+            setTimeout(() => {
+                draggedElement = null;
+            }, 100);
+        });
+    });
+
+    // Add drop zone event listeners
+    document.querySelectorAll('.drop-zone').forEach(zone => {
+        zone.addEventListener('dragover', function(e) {
+            e.preventDefault();
+            this.classList.add('bg-blue-50', 'dark:bg-blue-900/20');
+        });
+
+        zone.addEventListener('dragleave', function(e) {
+            this.classList.remove('bg-blue-50', 'dark:bg-blue-900/20');
+        });
+
+        zone.addEventListener('drop', function(e) {
+            e.preventDefault();
+            this.classList.remove('bg-blue-50', 'dark:bg-blue-900/20');
+            
+            if (!draggedElement || !draggedElement.dataset) {
+                console.warn('No valid dragged element found');
+                return;
+            }
+
+            const newStatus = this.dataset.status;
+            const currentStatus = draggedElement.dataset.currentStatus;
+            const appId = draggedElement.dataset.appId;
+
+            if (!newStatus || !currentStatus || !appId) {
+                console.warn('Missing required data attributes');
+                return;
+            }
+
+            if (newStatus === currentStatus) return;
+
+            // Update application status via API
+            fetch('/applications/update-status/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': csrftoken,
+                },
+                body: JSON.stringify({
+                    application_id: parseInt(appId),
+                    status: newStatus
+                })
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                return response.json();
+            })
+            .then(data => {
+                if (data.success) {
+                    // Move the card to the new column
+                    const targetContainer = this.querySelector('[data-status="' + newStatus + '"]');
+                    const emptyPlaceholder = targetContainer.querySelector('.empty-placeholder');
+                    if (emptyPlaceholder) {
+                        emptyPlaceholder.remove();
+                    }
+                    
+                    // Update the card's status
+                    draggedElement.dataset.currentStatus = newStatus;
+                    targetContainer.appendChild(draggedElement);
+                    
+                    // Check if old container is now empty
+                    const oldContainer = document.querySelector('[data-status="' + currentStatus + '"]');
+                    if (oldContainer && oldContainer.children.length === 0) {
+                        oldContainer.innerHTML = '<div class="text-sm text-gray-400 empty-placeholder">None</div>';
+                    }
+                    
+                    showMessage(`Application moved to ${data.status_display}`);
+                } else {
+                    showMessage(data.error || 'Failed to update application', true);
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                showMessage(`Error: ${error.message}`, true);
+            });
+        });
+    });
+
+    // Global error handler for any uncaught drag/drop issues
+    window.addEventListener('error', function(e) {
+        if (e.message.includes('dataset') || e.message.includes('draggedElement')) {
+            console.warn('Drag/drop error caught:', e.message);
+            showMessage('Drag operation failed. Please try again.', true);
+            // Reset drag state
+            draggedElement = null;
+            document.querySelectorAll('.application-card').forEach(card => {
+                card.style.opacity = '';
+            });
+            document.querySelectorAll('.drop-zone').forEach(zone => {
+                zone.classList.remove('bg-blue-50', 'dark:bg-blue-900/20');
+            });
+        }
+    });
+});
+</script>
 {% endblock %}
 
 

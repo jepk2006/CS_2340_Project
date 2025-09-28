@@ -26,12 +26,25 @@
     </div>
     <div class="mt-4">
       {% if request.user.is_authenticated %}
-      <form action="{% url 'jobs:apply_one_click' job.pk %}" method="post" class="space-y-2">
-        {% csrf_token %}
-        <label class="block text-sm">Personalized note</label>
-        <textarea name="note" class="min-h-[100px]"></textarea>
-        <button type="submit" class="w-full bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-500">One‑click Apply</button>
-      </form>
+        {% if request.user.jobseeker_profile.account_type == 'recruiter' %}
+          {% if job.posted_by == request.user %}
+            <div class="space-y-3">
+              <div class="text-sm font-medium text-green-700 dark:text-green-400">✓ You posted this job</div>
+              <a href="/applications/recruiter/?job={{ job.pk }}" class="w-full inline-flex items-center justify-center bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-500">View Applications</a>
+            </div>
+          {% else %}
+            <div class="text-sm text-gray-500 dark:text-gray-400 text-center py-4">
+              Recruiters cannot apply to jobs
+            </div>
+          {% endif %}
+        {% else %}
+          <form action="{% url 'jobs:apply_one_click' job.pk %}" method="post" class="space-y-2">
+            {% csrf_token %}
+            <label class="block text-sm">Personalized note</label>
+            <textarea name="note" class="min-h-[100px]"></textarea>
+            <button type="submit" class="w-full bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-500">One‑click Apply</button>
+          </form>
+        {% endif %}
       {% else %}
         <a class="w-full inline-flex items-center justify-center bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-500" href="/login/?next={{ request.path }}">Login to apply</a>
       {% endif %}
