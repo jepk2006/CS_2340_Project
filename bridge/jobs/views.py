@@ -1,12 +1,15 @@
 from django.contrib.auth.decorators import login_required
-from django.shortcuts import get_object_or_404, redirect, render
-from django.views.generic import ListView, DetailView
+from django.http import JsonResponse
+from django.shortcuts import get_object_or_404, redirect
+from django.urls import reverse
+from django.views.generic import DetailView
 from django_filters.views import FilterView
 import django_filters
 import math
 
 from .models import Job, Skill, Application
 from django.views.decorators.http import require_POST
+from accounts.models import JobSeekerProfile
 
 
 def calculate_distance(lat1, lon1, lat2, lon2):
@@ -29,6 +32,64 @@ def calculate_distance(lat1, lon1, lat2, lon2):
     # Radius of Earth in miles
     r = 3959
     return c * r
+
+
+def _get_jobseeker_profile(user):
+    if not user.is_authenticated:
+        return None
+    try:
+        return user.jobseeker_profile
+    except JobSeekerProfile.DoesNotExist:
+        return None
+
+
+def apply_commute_radius_filter(queryset, user):
+    profile = _get_jobseeker_profile(user)
+    if not profile or not profile.commute_radius or not profile.latitude or not profile.longitude:
+        return queryset
+
+    user_lat = float(profile.latitude)
+    user_lon = float(profile.longitude)
+    jobs_within_radius = []
+
+    for job in queryset:
+        if job.latitude and job.longitude:
+            distance = calculate_distance(
+                user_lat,
+                user_lon,
+                float(job.latitude),
+                float(job.longitude),
+            )
+            if distance is not None and distance <= profile.commute_radius:
+                jobs_within_radius.append(job.pk)
+
+    if not jobs_within_radius:
+        return queryset.none()
+
+    return queryset.filter(pk__in=jobs_within_radius)
+
+
+def build_distance_lookup(jobs, user):
+    profile = _get_jobseeker_profile(user)
+    if not profile or not profile.latitude or not profile.longitude:
+        return {}
+
+    user_lat = float(profile.latitude)
+    user_lon = float(profile.longitude)
+    distances = {}
+
+    for job in jobs:
+        if job.latitude and job.longitude:
+            distance = calculate_distance(
+                user_lat,
+                user_lon,
+                float(job.latitude),
+                float(job.longitude),
+            )
+            if distance is not None:
+                distances[job.pk] = round(distance, 1)
+
+    return distances
 
 
 class JobFilter(django_filters.FilterSet):
@@ -68,56 +129,12 @@ class JobListView(FilterView):
 
     def get_queryset(self):
         queryset = super().get_queryset()
-        
-        # Filter by commute radius if user is authenticated and has a profile with commute radius
-        if self.request.user.is_authenticated:
-            try:
-                profile = self.request.user.jobseeker_profile
-                if profile.commute_radius and profile.latitude and profile.longitude:
-                    # Filter jobs within the commute radius
-                    jobs_within_radius = []
-                    for job in queryset:
-                        if job.latitude and job.longitude:
-                            distance = calculate_distance(
-                                float(profile.latitude),
-                                float(profile.longitude),
-                                float(job.latitude),
-                                float(job.longitude)
-                            )
-                            if distance is not None and distance <= profile.commute_radius:
-                                jobs_within_radius.append(job.pk)
-                    
-                    # Filter the queryset to only include jobs within radius
-                    queryset = queryset.filter(pk__in=jobs_within_radius)
-            except:
-                # If no profile exists, continue with all jobs
-                pass
-        
-        return queryset
+        return apply_commute_radius_filter(queryset, self.request.user)
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        
-        # Add distance information for each job if user has location set
-        if self.request.user.is_authenticated:
-            try:
-                profile = self.request.user.jobseeker_profile
-                if profile.latitude and profile.longitude:
-                    job_distances = {}
-                    for job in context['jobs']:
-                        if job.latitude and job.longitude:
-                            distance = calculate_distance(
-                                float(profile.latitude),
-                                float(profile.longitude),
-                                float(job.latitude),
-                                float(job.longitude)
-                            )
-                            if distance is not None:
-                                job_distances[job.pk] = round(distance, 1)
-                    context['job_distances'] = job_distances
-            except:
-                pass
-        
+        job_list = context.get("jobs", [])
+        context["job_distances"] = build_distance_lookup(job_list, self.request.user)
         return context
 
 
@@ -137,5 +154,77 @@ def apply_one_click(request, pk):
         application.note = note
         application.save()
     return redirect("applications:my_applications")
+
+
+def job_map_data(request):
+    filterset = JobFilter(request.GET, queryset=Job.objects.all())
+    queryset = apply_commute_radius_filter(filterset.qs, request.user)
+    jobs = list(queryset)
+
+    profile = _get_jobseeker_profile(request.user)
+    user_location = None
+    if profile and profile.latitude and profile.longitude:
+        user_location = {
+            "latitude": float(profile.latitude),
+            "longitude": float(profile.longitude),
+        }
+
+    results = []
+    missing_count = 0
+
+    for job in jobs:
+        if not job.latitude or not job.longitude:
+            missing_count += 1
+            continue
+
+        lat = float(job.latitude)
+        lon = float(job.longitude)
+        distance = None
+
+        if user_location:
+            distance = calculate_distance(
+                user_location["latitude"],
+                user_location["longitude"],
+                lat,
+                lon,
+            )
+            if distance is not None:
+                distance = round(distance, 1)
+
+        location_parts = [job.location_city, job.location_state, job.location_country]
+        location = ", ".join([part for part in location_parts if part])
+
+        salary_range = None
+        if job.min_salary and job.max_salary:
+            salary_range = f"${job.min_salary:,} - ${job.max_salary:,}"
+        elif job.min_salary:
+            salary_range = f"From ${job.min_salary:,}"
+        elif job.max_salary:
+            salary_range = f"Up to ${job.max_salary:,}"
+
+        results.append(
+            {
+                "id": job.pk,
+                "title": job.title,
+                "company": job.company,
+                "latitude": lat,
+                "longitude": lon,
+                "work_type": job.get_work_type_display(),
+                "location": location,
+                "salary_range": salary_range,
+                "visa_sponsorship": job.visa_sponsorship,
+                "detail_url": reverse("jobs:job_detail", args=[job.pk]),
+                "distance_miles": distance,
+            }
+        )
+
+    return JsonResponse(
+        {
+            "results": results,
+            "missing_count": missing_count,
+            "total_count": len(jobs),
+            "user_location": user_location,
+        }
+    )
 
 # Create your views here.

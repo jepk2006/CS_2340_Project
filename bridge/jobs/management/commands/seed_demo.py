@@ -112,6 +112,13 @@ class Command(BaseCommand):
         ]
 
         created_jobs = []
+        coords = {
+            "Software Engineer I": (33.7490, -84.3880),  # Atlanta
+            "Data Analyst": (40.7128, -74.0060),  # New York
+            "Frontend Developer": (37.7749, -122.4194),  # San Francisco
+            "Cloud Support Associate": (30.2672, -97.7431),  # Austin
+        }
+
         for jd in jobs_data:
             job, _ = Job.objects.get_or_create(
                 title=jd["title"],
@@ -128,6 +135,10 @@ class Command(BaseCommand):
                 },
             )
             job.posted_by = recruiter
+            lat_lon = coords.get(jd["title"])
+            if lat_lon:
+                job.latitude = lat_lon[0]
+                job.longitude = lat_lon[1]
             job.save()
             job.skills.set([skills[name] for name in jd["skills"]])
             created_jobs.append(job)
