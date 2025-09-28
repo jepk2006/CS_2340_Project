@@ -279,4 +279,9 @@ def job_map_data(request):
         }
     )
 
+@login_required
+def job_create(request):
+    # Minimal placeholder to satisfy URL import; redirect to recruiter dashboard
+    return redirect("applications:recruiter_applications")
+
 # Create your views here.
