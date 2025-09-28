@@ -1,4 +1,14 @@
 {% extends "base.html" %}
+
+{% block extra_head %}
+  {{ block.super }}
+  <link
+    rel="stylesheet"
+    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    crossorigin=""
+  />
+{% endblock %}
+
 {% block content %}
 <div class="grid grid-cols-1 lg:grid-cols-4 gap-8">
   <aside class="lg:col-span-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-800 rounded-xl p-4 h-fit sticky top-24">
@@ -24,14 +34,6 @@
       <div>
         <label class="block mb-1">Company</label>
         <input type="text" name="company" placeholder="Company" value="{{ request.GET.company }}" />
-      </div>
-      <div>
-        <label class="block mb-1">Skills</label>
-        <select name="skills" multiple="multiple" class="w-full p-2 border border-gray-300 dark:border-gray-700 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
-          {% for skill in filter.form.skills %}
-            <option value="{{ skill.data.value }}" {% if skill.data.selected %}selected{% endif %}>{{ skill.choice_label }}</option>
-          {% endfor %}
-        </select>
       </div>
       <div class="grid grid-cols-3 gap-2">
         <div>
@@ -74,48 +76,33 @@
     </form>
   </aside>
 
-  <section class="lg:col-span-3 space-y-4">
-    {% if recommended_jobs %}
-    <div class="mb-6">
-      <h2 class="text-2xl font-semibold mb-4">Recommended Jobs</h2>
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {% for job in recommended_jobs %}
-          <a href="{% url 'jobs:job_detail' job.pk %}" class="job-card block border border-gray-200 dark:border-gray-800 rounded-xl p-5 bg-white dark:bg-gray-800 hover:shadow-lg">
-            <div class="flex items-start justify-between">
-              <div>
-                <div class="text-lg font-semibold">{{ job.title }}</div>
-                <div class="text-sm text-gray-500">{{ job.company }}</div>
-              </div>
-              <span class="text-xs rounded-full px-2 py-1 border border-gray-300 dark:border-gray-700">{{ job.get_work_type_display }}</span>
-            </div>
-            <div class="mt-2 text-sm text-gray-600 dark:text-gray-300 line-clamp-2">{{ job.description }}</div>
-            <div class="mt-3 flex flex-wrap gap-2">
-              {% for s in job.skills.all %}
-                <span class="text-xs bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 px-2 py-1 rounded">{{ s.name }}</span>
-              {% empty %}
-                <span class="text-xs text-gray-400">No skills listed</span>
-              {% endfor %}
-            </div>
-            <div class="mt-3 text-sm text-gray-500 flex items-center gap-4">
-              <span>{{ job.location_city }} {{ job.location_state }} {{ job.location_country }}</span>
-              <span>
-                {% if job.min_salary %}${{ job.min_salary }}{% endif %}
-                {% if job.max_salary %}- ${{ job.max_salary }}{% endif %}
-              </span>
-              <span>Visa: {{ job.visa_sponsorship|yesno:"Yes,No" }}</span>
-            </div>
-          </a>
-        {% endfor %}
+  <section class="lg:col-span-3 space-y-4" x-data="{ view: 'list' }">
+    <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+      <div>
+        <h1 class="text-2xl font-semibold">Job openings</h1>
+        <div class="text-sm text-gray-500">{{ page_obj.paginator.count }} results</div>
+      </div>
+      <div class="flex items-center gap-2 self-start md:self-auto">
+        <span class="text-xs text-gray-500 uppercase tracking-wide">View</span>
+        <div class="inline-flex rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+          <button
+            type="button"
+            data-view-toggle="list"
+            class="px-3 py-1.5 text-sm font-medium bg-gray-100 dark:bg-gray-800"
+          >List</button>
+          <button
+            type="button"
+            data-view-toggle="map"
+            class="px-3 py-1.5 text-sm font-medium"
+          >Map</button>
+        </div>
       </div>
     </div>
-    {% endif %}
-    <div class="flex items-center justify-between">
-      <h1 class="text-2xl font-semibold">Job openings</h1>
-      <div class="text-sm text-gray-500">{{ page_obj.paginator.count }} results</div>
-    </div>
-    <div class="grid grid-cols-1 gap-4">
+    <div id="mapStatus" class="hidden text-sm text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-lg px-4 py-3"></div>
+
+    <div id="jobListSection" class="grid grid-cols-1 gap-4">
       {% for job in jobs %}
-        <a href="{% url 'jobs:job_detail' job.pk %}" class="job-card block border border-gray-200 dark:border-gray-800 rounded-xl p-5 bg-white dark:bg-gray-800 hover:shadow">
+        <a href="{% url 'jobs:job_detail' job.pk %}" class="block border border-gray-200 dark:border-gray-800 rounded-xl p-5 bg-white dark:bg-gray-800 hover:shadow">
           <div class="flex items-start justify-between">
             <div>
               <div class="text-lg font-semibold">{{ job.title }}</div>
@@ -166,27 +153,14 @@
     </div>
 
     <div id="jobMapContainer" class="hidden">
-      <div class="mb-3 space-y-2">
-        <div class="flex flex-col md:flex-row md:items-center gap-2">
-          <div class="flex items-center gap-2">
-            <label for="distanceMilesInput" class="text-sm">Max distance (miles)</label>
-            <input id="distanceMilesInput" type="number" min="1" step="1" placeholder="e.g. 25" class="w-24" />
-          </div>
-          <div class="flex items-center gap-2">
-            <button id="useLocationBtn" type="button" class="px-3 py-1.5 rounded border border-gray-300 dark:border-gray-700">Use My Location</button>
-            <button id="applyDistanceBtn" type="button" class="px-3 py-1.5 rounded bg-indigo-600 text-white">Apply Distance</button>
-          </div>
+      <div class="mb-3 flex flex-col md:flex-row md:items-center gap-2">
+        <div class="flex items-center gap-2">
+          <label for="distanceMilesInput" class="text-sm">Max distance (miles)</label>
+          <input id="distanceMilesInput" type="number" min="1" step="1" placeholder="e.g. 25" class="w-24" />
         </div>
-        <div class="flex flex-col md:flex-row md:items-center gap-2">
-          <div class="text-sm text-gray-600 dark:text-gray-400">Or enter coordinates manually:</div>
-          <div class="flex items-center gap-2">
-            <input id="manualLatInput" type="number" step="any" placeholder="33.7490" class="w-28 text-sm" title="Latitude (e.g., 33.7490 for Atlanta)" />
-            <input id="manualLonInput" type="number" step="any" placeholder="-84.3880" class="w-28 text-sm" title="Longitude (e.g., -84.3880 for Atlanta)" />
-            <button id="useManualLocationBtn" type="button" class="px-2 py-1 text-sm rounded border border-gray-300 dark:border-gray-700">Set Location</button>
-          </div>
-        </div>
-        <div class="text-xs text-gray-500 dark:text-gray-400">
-          Examples: Atlanta (33.7490, -84.3880), NYC (40.7128, -74.0060), SF (37.7749, -122.4194)
+        <div class="flex items-center gap-2">
+          <button id="useLocationBtn" type="button" class="px-3 py-1.5 rounded border border-gray-300 dark:border-gray-700">Use My Location</button>
+          <button id="applyDistanceBtn" type="button" class="px-3 py-1.5 rounded bg-indigo-600 text-white">Apply Distance</button>
         </div>
       </div>
       <div id="jobMap" class="h-96 rounded-xl overflow-hidden border border-gray-200 dark:border-gray-800"></div>
@@ -236,9 +210,6 @@
       const distanceInput = document.getElementById('distanceMilesInput');
       const useLocationBtn = document.getElementById('useLocationBtn');
       const applyDistanceBtn = document.getElementById('applyDistanceBtn');
-      const manualLatInput = document.getElementById('manualLatInput');
-      const manualLonInput = document.getElementById('manualLonInput');
-      const useManualLocationBtn = document.getElementById('useManualLocationBtn');
 
       if (!listToggle || !mapToggle || !jobListSection || !mapContainer) {
         return;
@@ -459,60 +430,20 @@
             mapStatus.classList.remove('hidden');
             return;
           }
-
-          // Show loading state
-          useLocationBtn.disabled = true;
-          useLocationBtn.textContent = 'Getting location...';
-          mapStatus.textContent = 'Requesting your location...';
-          mapStatus.classList.remove('hidden');
-
           navigator.geolocation.getCurrentPosition(
             (pos) => {
               userLat = pos.coords.latitude;
               userLon = pos.coords.longitude;
-              console.log('Location obtained:', userLat, userLon);
-              
-              // Reset button state
-              useLocationBtn.disabled = false;
-              useLocationBtn.textContent = 'Use My Location';
-              
-              mapStatus.textContent = `Location set: ${userLat.toFixed(4)}, ${userLon.toFixed(4)}`;
+              mapStatus.textContent = 'Location set.';
               mapStatus.classList.remove('hidden');
-              
-              // Update map with new location
               updateMapData();
             },
             (err) => {
-              console.error('Geolocation error:', err);
-              
-              // Reset button state
-              useLocationBtn.disabled = false;
-              useLocationBtn.textContent = 'Use My Location';
-              
-              let errorMessage = 'Could not get your location. ';
-              switch(err.code) {
-                case err.PERMISSION_DENIED:
-                  errorMessage += 'Please allow location access in your browser settings and try again.';
-                  break;
-                case err.POSITION_UNAVAILABLE:
-                  errorMessage += 'Location information is unavailable.';
-                  break;
-                case err.TIMEOUT:
-                  errorMessage += 'Location request timed out. Please try again.';
-                  break;
-                default:
-                  errorMessage += 'An unknown error occurred.';
-                  break;
-              }
-              
-              mapStatus.textContent = errorMessage;
+              console.error(err);
+              mapStatus.textContent = 'Could not get your location. Please allow access and try again.';
               mapStatus.classList.remove('hidden');
             },
-            { 
-              enableHighAccuracy: true, 
-              timeout: 15000, 
-              maximumAge: 300000 // 5 minutes
-            }
+            { enableHighAccuracy: true, timeout: 8000 }
           );
         });
       }
@@ -526,45 +457,9 @@
         });
       }
 
-      if (useManualLocationBtn) {
-        useManualLocationBtn.addEventListener('click', () => {
-          const lat = parseFloat(manualLatInput?.value || '');
-          const lon = parseFloat(manualLonInput?.value || '');
-          
-          if (isNaN(lat) || isNaN(lon)) {
-            mapStatus.textContent = 'Please enter valid latitude and longitude values.';
-            mapStatus.classList.remove('hidden');
-            return;
-          }
-          
-          if (lat < -90 || lat > 90) {
-            mapStatus.textContent = 'Latitude must be between -90 and 90.';
-            mapStatus.classList.remove('hidden');
-            return;
-          }
-          
-          if (lon < -180 || lon > 180) {
-            mapStatus.textContent = 'Longitude must be between -180 and 180.';
-            mapStatus.classList.remove('hidden');
-            return;
-          }
-          
-          userLat = lat;
-          userLon = lon;
-          console.log('Manual location set:', userLat, userLon);
-          
-          mapStatus.textContent = `Manual location set: ${userLat.toFixed(4)}, ${userLon.toFixed(4)}`;
-          mapStatus.classList.remove('hidden');
-          
-          updateMapData();
-        });
-      }
-
       listToggle.addEventListener('click', showListView);
       mapToggle.addEventListener('click', showMapView);
       showListView();
     })();
   </script>
 {% endblock %}
-
-

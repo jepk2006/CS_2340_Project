@@ -1,15 +1,15 @@
 from django.contrib.auth.decorators import login_required
-from django.shortcuts import get_object_or_404, redirect, render
-from django.views.generic import ListView, DetailView
+from django.http import JsonResponse
+from django.shortcuts import get_object_or_404, redirect
+from django.urls import reverse
+from django.views.generic import DetailView
 from django_filters.views import FilterView
 import django_filters
 import math
 
 from .models import Job, Skill, Application
-from .forms import JobForm
 from django.views.decorators.http import require_POST
 from accounts.models import JobSeekerProfile
-from .decorators import recruiter_required
 
 
 def calculate_distance(lat1, lon1, lat2, lon2):
@@ -135,9 +135,6 @@ class JobListView(FilterView):
         context = super().get_context_data(**kwargs)
         job_list = context.get("jobs", [])
         context["job_distances"] = build_distance_lookup(job_list, self.request.user)
-        if self.request.user.is_authenticated and hasattr(self.request.user, 'jobseeker_profile'):
-            job_seeker_profile = self.request.user.jobseeker_profile
-            context['recommended_jobs'] = job_seeker_profile.get_recommended_jobs().exclude(id__in=self.object_list.values_list('id', flat=True))[:5] # Limit to 5 recommended jobs
         return context
 
 
@@ -151,36 +148,12 @@ class JobDetailView(DetailView):
 @require_POST
 def apply_one_click(request, pk):
     job = get_object_or_404(Job, pk=pk)
-    
-    # Check if user is a recruiter
-    profile = _get_jobseeker_profile(request.user)
-    if profile and profile.account_type == 'recruiter':
-        from django.contrib import messages
-        messages.error(request, "Recruiters cannot apply to jobs.")
-        return redirect("jobs:job_detail", pk=pk)
-    
     note = request.POST.get("note", "")
     application, created = Application.objects.get_or_create(job=job, applicant=request.user, defaults={"note": note})
     if not created and note:
         application.note = note
         application.save()
     return redirect("applications:my_applications")
-
-
-@login_required
-@recruiter_required
-def job_create(request):
-    if request.method == "POST":
-        form = JobForm(request.POST)
-        if form.is_valid():
-            job = form.save(commit=False)
-            job.posted_by = request.user
-            job.save()
-            form.save_m2m() # Save ManyToMany relationships
-            return redirect("jobs:job_detail", pk=job.pk)
-    else:
-        form = JobForm()
-    return render(request, "jobs/job_form.html", {"form": form})
 
 
 def job_map_data(request):
@@ -200,7 +173,7 @@ def job_map_data(request):
 
     # Prefer explicit query params if provided
     try:
-        if lat_param and lon_param:
+        if lat_param is not None and lon_param is not None:
             user_lat = float(lat_param)
             user_lon = float(lon_param)
     except (TypeError, ValueError):
