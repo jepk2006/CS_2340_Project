@@ -4,3 +4,4 @@ __pycache__/
 bridge/CS2340/lib/*
 bridge/CS2340/bin/*
 **/.venv/
+**/__pycache__/**
