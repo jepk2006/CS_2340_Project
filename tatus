@@ -1,0 +1,430 @@
+[1mdiff --cc bridge/jobs/views.py[m
+[1mindex 74f8484,4cea3de..0000000[m
+[1m--- a/bridge/jobs/views.py[m
+[1m+++ b/bridge/jobs/views.py[m
+[36m@@@ -8,8 -6,9 +8,13 @@@[m [mimport django_filter[m
+  import math[m
+  [m
+  from .models import Job, Skill, Application[m
+[32m+ from .forms import JobForm[m
+  from django.views.decorators.http import require_POST[m
+[32m++<<<<<<< Updated upstream[m
+[32m +from accounts.models import JobSeekerProfile[m
+[32m++=======[m
+[32m+ from .decorators import recruiter_required[m
+[32m++>>>>>>> Stashed changes[m
+  [m
+  [m
+  def calculate_distance(lat1, lon1, lat2, lon2):[m
+[36m@@@ -133,8 -99,9 +138,14 @@@[m [mclass JobListView(FilterView)[m
+  [m
+      def get_context_data(self, **kwargs):[m
+          context = super().get_context_data(**kwargs)[m
+[32m++<<<<<<< Updated upstream[m
+[32m +        job_list = context.get("jobs", [])[m
+[32m +        context["job_distances"] = build_distance_lookup(job_list, self.request.user)[m
+[32m++=======[m
+[32m+         if self.request.user.is_authenticated and hasattr(self.request.user, 'jobseeker_profile'):[m
+[32m+             job_seeker_profile = self.request.user.jobseeker_profile[m
+[32m+             context['recommended_jobs'] = job_seeker_profile.get_recommended_jobs().exclude(id__in=self.object_list.values_list('id', flat=True))[:5] # Limit to 5 recommended jobs[m
+[32m++>>>>>>> Stashed changes[m
+          return context[m
+  [m
+  [m
+[36m@@@ -156,127 -123,19 +167,144 @@@[m [mdef apply_one_click(request, pk)[m
+      return redirect("applications:my_applications")[m
+  [m
+  [m
+[32m++<<<<<<< Updated upstream[m
+[32m +def job_map_data(request):[m
+[32m +    filterset = JobFilter(request.GET, queryset=Job.objects.all())[m
+[32m +    qs = filterset.qs[m
+[32m +[m
+[32m +    # Optional map-specific filtering via query params[m
+[32m +    lat_param = request.GET.get("user_lat")[m
+[32m +    lon_param = request.GET.get("user_lon")[m
+[32m +    max_dist_param = request.GET.get("max_distance")[m
+[32m +[m
+[32m +    profile = _get_jobseeker_profile(request.user)[m
+[32m +[m
+[32m +    user_lat = None[m
+[32m +    user_lon = None[m
+[32m +    distance_limit = None[m
+[32m +[m
+[32m +    # Prefer explicit query params if provided[m
+[32m +    try:[m
+[32m +        if lat_param is not None and lon_param is not None:[m
+[32m +            user_lat = float(lat_param)[m
+[32m +            user_lon = float(lon_param)[m
+[32m +    except (TypeError, ValueError):[m
+[32m +        user_lat = None[m
+[32m +        user_lon = None[m
+[32m +[m
+[32m +    if max_dist_param:[m
+[32m +        try:[m
+[32m +            distance_limit = float(max_dist_param)[m
+[32m +        except (TypeError, ValueError):[m
+[32m +            distance_limit = None[m
+[32m +[m
+[32m +    # Fallback to saved profile location / commute radius if not provided[m
+[32m +    if (user_lat is None or user_lon is None) and profile and profile.latitude and profile.longitude:[m
+[32m +        user_lat = float(profile.latitude)[m
+[32m +        user_lon = float(profile.longitude)[m
+[32m +[m
+[32m +    if distance_limit is None and profile and profile.commute_radius:[m
+[32m +        distance_limit = float(profile.commute_radius)[m
+[32m +[m
+[32m +    # Apply distance filter only if we have both a location and a distance[m
+[32m +    if user_lat is not None and user_lon is not None and distance_limit:[m
+[32m +        pks_within = [][m
+[32m +        for job in qs:[m
+[32m +            if job.latitude and job.longitude:[m
+[32m +                d = calculate_distance([m
+[32m +                    user_lat,[m
+[32m +                    user_lon,[m
+[32m +                    float(job.latitude),[m
+[32m +                    float(job.longitude),[m
+[32m +                )[m
+[32m +                if d is not None and d <= distance_limit:[m
+[32m +                    pks_within.append(job.pk)[m
+[32m +        if pks_within:[m
+[32m +            qs = qs.filter(pk__in=pks_within)[m
+[32m +        else:[m
+[32m +            qs = qs.none()[m
+[32m +[m
+[32m +    jobs = list(qs)[m
+[32m +[m
+[32m +    user_location = None[m
+[32m +    if user_lat is not None and user_lon is not None:[m
+[32m +        user_location = {[m
+[32m +            "latitude": float(user_lat),[m
+[32m +            "longitude": float(user_lon),[m
+[32m +        }[m
+[32m +[m
+[32m +    results = [][m
+[32m +    missing_count = 0[m
+[32m +[m
+[32m +    for job in jobs:[m
+[32m +        if not job.latitude or not job.longitude:[m
+[32m +            missing_count += 1[m
+[32m +            continue[m
+[32m +[m
+[32m +        lat = float(job.latitude)[m
+[32m +        lon = float(job.longitude)[m
+[32m +        distance = None[m
+[32m +[m
+[32m +        if user_location:[m
+[32m +            distance = calculate_distance([m
+[32m +                user_location["latitude"],[m
+[32m +                user_location["longitude"],[m
+[32m +                lat,[m
+[32m +                lon,[m
+[32m +            )[m
+[32m +            if distance is not None:[m
+[32m +                distance = round(distance, 1)[m
+[32m +[m
+[32m +        location_parts = [job.location_city, job.location_state, job.location_country][m
+[32m +        location = ", ".join([part for part in location_parts if part])[m
+[32m +[m
+[32m +        salary_range = None[m
+[32m +        if job.min_salary and job.max_salary:[m
+[32m +            salary_range = f"${job.min_salary:,} - ${job.max_salary:,}"[m
+[32m +        elif job.min_salary:[m
+[32m +            salary_range = f"From ${job.min_salary:,}"[m
+[32m +        elif job.max_salary:[m
+[32m +            salary_range = f"Up to ${job.max_salary:,}"[m
+[32m +[m
+[32m +        results.append([m
+[32m +            {[m
+[32m +                "id": job.pk,[m
+[32m +                "title": job.title,[m
+[32m +                "company": job.company,[m
+[32m +                "latitude": lat,[m
+[32m +                "longitude": lon,[m
+[32m +                "work_type": job.get_work_type_display(),[m
+[32m +                "location": location,[m
+[32m +                "salary_range": salary_range,[m
+[32m +                "visa_sponsorship": job.visa_sponsorship,[m
+[32m +                "detail_url": reverse("jobs:job_detail", args=[job.pk]),[m
+[32m +                "distance_miles": distance,[m
+[32m +            }[m
+[32m +        )[m
+[32m +[m
+[32m +    return JsonResponse([m
+[32m +        {[m
+[32m +            "results": results,[m
+[32m +            "missing_count": missing_count,[m
+[32m +            "total_count": len(jobs),[m
+[32m +            "user_location": user_location,[m
+[32m +        }[m
+[32m +    )[m
+[32m++=======[m
+[32m+ @login_required[m
+[32m+ @recruiter_required[m
+[32m+ def job_create(request):[m
+[32m+     if request.method == "POST":[m
+[32m+         form = JobForm(request.POST)[m
+[32m+         if form.is_valid():[m
+[32m+             job = form.save(commit=False)[m
+[32m+             job.posted_by = request.user[m
+[32m+             job.save()[m
+[32m+             form.save_m2m() # Save ManyToMany relationships[m
+[32m+             return redirect("jobs:job_detail", pk=job.pk)[m
+[32m+     else:[m
+[32m+         form = JobForm()[m
+[32m+     return render(request, "jobs/job_form.html", {"form": form})[m
+[32m++>>>>>>> Stashed changes[m
+  [m
+  # Create your views here.[m
+[1mdiff --cc bridge/templates/jobs/job_list.html[m
+[1mindex 413d897,33ab2a4..0000000[m
+[1m--- a/bridge/templates/jobs/job_list.html[m
+[1m+++ b/bridge/templates/jobs/job_list.html[m
+[36m@@@ -76,33 -74,48 +84,74 @@@[m
+      </form>[m
+    </aside>[m
+  [m
+[32m++<<<<<<< Updated upstream[m
+[32m +  <section class="lg:col-span-3 space-y-4" x-data="{ view: 'list' }">[m
+[32m +    <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-3">[m
+[32m +      <div>[m
+[32m +        <h1 class="text-2xl font-semibold">Job openings</h1>[m
+[32m +        <div class="text-sm text-gray-500">{{ page_obj.paginator.count }} results</div>[m
+[32m +      </div>[m
+[32m +      <div class="flex items-center gap-2 self-start md:self-auto">[m
+[32m +        <span class="text-xs text-gray-500 uppercase tracking-wide">View</span>[m
+[32m +        <div class="inline-flex rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">[m
+[32m +          <button[m
+[32m +            type="button"[m
+[32m +            data-view-toggle="list"[m
+[32m +            class="px-3 py-1.5 text-sm font-medium bg-gray-100 dark:bg-gray-800"[m
+[32m +          >List</button>[m
+[32m +          <button[m
+[32m +            type="button"[m
+[32m +            data-view-toggle="map"[m
+[32m +            class="px-3 py-1.5 text-sm font-medium"[m
+[32m +          >Map</button>[m
+[32m +        </div>[m
+[32m +      </div>[m
+[32m++=======[m
+[32m+   <section class="lg:col-span-3 space-y-4">[m
+[32m+     {% if recommended_jobs %}[m
+[32m+     <div class="mb-6">[m
+[32m+       <h2 class="text-2xl font-semibold mb-4">Recommended Jobs</h2>[m
+[32m+       <div class="grid grid-cols-1 md:grid-cols-2 gap-4">[m
+[32m+         {% for job in recommended_jobs %}[m
+[32m+           <a href="{% url 'jobs:job_detail' job.pk %}" class="job-card block border border-gray-200 dark:border-gray-800 rounded-xl p-5 bg-white dark:bg-gray-800 hover:shadow-lg">[m
+[32m+             <div class="flex items-start justify-between">[m
+[32m+               <div>[m
+[32m+                 <div class="text-lg font-semibold">{{ job.title }}</div>[m
+[32m+                 <div class="text-sm text-gray-500">{{ job.company }}</div>[m
+[32m+               </div>[m
+[32m+               <span class="text-xs rounded-full px-2 py-1 border border-gray-300 dark:border-gray-700">{{ job.get_work_type_display }}</span>[m
+[32m+             </div>[m
+[32m+             <div class="mt-2 text-sm text-gray-600 dark:text-gray-300 line-clamp-2">{{ job.description }}</div>[m
+[32m+             <div class="mt-3 flex flex-wrap gap-2">[m
+[32m+               {% for s in job.skills.all %}[m
+[32m+                 <span class="text-xs bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 px-2 py-1 rounded">{{ s.name }}</span>[m
+[32m+               {% empty %}[m
+[32m+                 <span class="text-xs text-gray-400">No skills listed</span>[m
+[32m+               {% endfor %}[m
+[32m+             </div>[m
+[32m+             <div class="mt-3 text-sm text-gray-500 flex items-center gap-4">[m
+[32m+               <span>{{ job.location_city }} {{ job.location_state }} {{ job.location_country }}</span>[m
+[32m+               <span>[m
+[32m+                 {% if job.min_salary %}${{ job.min_salary }}{% endif %}[m
+[32m+                 {% if job.max_salary %}- ${{ job.max_salary }}{% endif %}[m
+[32m+               </span>[m
+[32m+               <span>Visa: {{ job.visa_sponsorship|yesno:"Yes,No" }}</span>[m
+[32m+             </div>[m
+[32m+           </a>[m
+[32m+         {% endfor %}[m
+[32m+       </div>[m
+[32m+     </div>[m
+[32m+     {% endif %}[m
+[32m+     <div class="flex items-center justify-between">[m
+[32m+       <h1 class="text-2xl font-semibold">Job openings</h1>[m
+[32m+       <div class="text-sm text-gray-500">{{ page_obj.paginator.count }} results</div>[m
+[32m++>>>>>>> Stashed changes[m
+      </div>[m
+[31m -    <div class="grid grid-cols-1 gap-4">[m
+[32m +    <div id="mapStatus" class="hidden text-sm text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-lg px-4 py-3"></div>[m
+[32m +[m
+[32m +    <div id="jobListSection" class="grid grid-cols-1 gap-4">[m
+        {% for job in jobs %}[m
+[31m-         <a href="{% url 'jobs:job_detail' job.pk %}" class="block border border-gray-200 dark:border-gray-800 rounded-xl p-5 bg-white dark:bg-gray-800 hover:shadow">[m
+[32m+         <a href="{% url 'jobs:job_detail' job.pk %}" class="job-card block border border-gray-200 dark:border-gray-800 rounded-xl p-5 bg-white dark:bg-gray-800 hover:shadow">[m
+            <div class="flex items-start justify-between">[m
+              <div>[m
+                <div class="text-lg font-semibold">{{ job.title }}</div>[m
+[36m@@@ -185,281 -184,17 +234,297 @@@[m
+  </div>[m
+  {% endblock %}[m
+  [m
+[32m +{% block extra_scripts %}[m
+[32m +  {{ block.super }}[m
+[32m +  <script[m
+[32m +    src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"[m
+[32m +    crossorigin=""[m
+[32m +  ></script>[m
+[32m +  <script>[m
+[32m +    (function() {[m
+[32m +      const listToggle = document.querySelector('[data-view-toggle="list"]');[m
+[32m +      const mapToggle = document.querySelector('[data-view-toggle="map"]');[m
+[32m +      const jobListSection = document.getElementById('jobListSection');[m
+[32m +      const paginationControls = document.getElementById('paginationControls');[m
+[32m +      const mapContainer = document.getElementById('jobMapContainer');[m
+[32m +      const mapStatus = document.getElementById('mapStatus');[m
+[32m +      const mapElement = document.getElementById('jobMap');[m
+[32m +      let mapInstance = null;[m
+[32m +      let markersLayer = null;[m
+[32m +      let hasLoaded = false;[m
+[32m +      let userLat = null;[m
+[32m +      let userLon = null;[m
+[32m +      let distanceMiles = null;[m
+[32m +[m
+[32m++<<<<<<< Updated upstream[m
+[32m +      const distanceInput = document.getElementById('distanceMilesInput');[m
+[32m +      const useLocationBtn = document.getElementById('useLocationBtn');[m
+[32m +      const applyDistanceBtn = document.getElementById('applyDistanceBtn');[m
+[32m +[m
+[32m +      if (!listToggle || !mapToggle || !jobListSection || !mapContainer) {[m
+[32m +        return;[m
+[32m +      }[m
+[32m +[m
+[32m +      function setActiveButton(activeButton) {[m
+[32m +        [listToggle, mapToggle].forEach((btn) => {[m
+[32m +          if (btn === activeButton) {[m
+[32m +            btn.classList.add('bg-gray-100', 'dark:bg-gray-800');[m
+[32m +          } else {[m
+[32m +            btn.classList.remove('bg-gray-100', 'dark:bg-gray-800');[m
+[32m +          }[m
+[32m +        });[m
+[32m +      }[m
+[32m +[m
+[32m +      function showListView() {[m
+[32m +        setActiveButton(listToggle);[m
+[32m +        jobListSection.classList.remove('hidden');[m
+[32m +        mapContainer.classList.add('hidden');[m
+[32m +        paginationControls?.classList.remove('hidden');[m
+[32m +        mapStatus.classList.add('hidden');[m
+[32m +      }[m
+[32m +[m
+[32m +      function showMapView() {[m
+[32m +        setActiveButton(mapToggle);[m
+[32m +        jobListSection.classList.add('hidden');[m
+[32m +        mapContainer.classList.remove('hidden');[m
+[32m +        paginationControls?.classList.add('hidden');[m
+[32m +        if (!hasLoaded) {[m
+[32m +          initializeMap();[m
+[32m +        } else if (mapInstance) {[m
+[32m +          setTimeout(() => {[m
+[32m +            mapInstance.invalidateSize();[m
+[32m +          }, 0);[m
+[32m +        }[m
+[32m +      }[m
+[32m +[m
+[32m +      function getMapUrl() {[m
+[32m +        const url = new URL(window.location.origin + '/jobs/map-data/');[m
+[32m +        const params = new URLSearchParams(window.location.search);[m
+[32m +        params.forEach((value, key) => url.searchParams.append(key, value));[m
+[32m +        if (userLat != null && userLon != null) {[m
+[32m +          url.searchParams.set('user_lat', String(userLat));[m
+[32m +          url.searchParams.set('user_lon', String(userLon));[m
+[32m +        }[m
+[32m +        const rawMiles = distanceInput?.value || '';[m
+[32m +        const miles = rawMiles ? parseFloat(rawMiles) : distanceMiles;[m
+[32m +        if (miles && !Number.isNaN(miles) && miles > 0) {[m
+[32m +          url.searchParams.set('max_distance', String(miles));[m
+[32m +        }[m
+[32m +        return url.toString();[m
+[32m +      }[m
+  [m
+[32m +      function initializeMap() {[m
+[32m +        fetch(getMapUrl())[m
+[32m +          .then((response) => {[m
+[32m +            if (!response.ok) {[m
+[32m +              throw new Error('Failed to load map data');[m
+[32m +            }[m
+[32m +            return response.json();[m
+[32m +          })[m
+[32m +          .then((data) => {[m
+[32m +            if (!mapInstance) {[m
+[32m +              mapInstance = L.map(mapElement).setView([20, 0], 2);[m
+[32m +              L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {[m
+[32m +                maxZoom: 19,[m
+[32m +                attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'[m
+[32m +              }).addTo(mapInstance);[m
+[32m +            }[m
+[32m +[m
+[32m +            if (markersLayer) {[m
+[32m +              markersLayer.clearLayers();[m
+[32m +            } else {[m
+[32m +              markersLayer = L.layerGroup().addTo(mapInstance);[m
+[32m +            }[m
+[32m +[m
+[32m +            const bounds = [];[m
+[32m +[m
+[32m +            data.results.forEach((job) => {[m
+[32m +              const marker = L.marker([job.latitude, job.longitude]).bindPopup([m
+[32m +                `<div class="space-y-1">[m
+[32m +                  <div class="font-semibold">${job.title}</div>[m
+[32m +                  <div class="text-sm text-gray-600">${job.company}</div>[m
+[32m +                  ${job.location ? `<div class="text-xs text-gray-500">${job.location}</div>` : ''}[m
+[32m +                  ${job.distance_miles ? `<div class="text-xs text-indigo-600">${job.distance_miles} miles away</div>` : ''}[m
+[32m +                  ${job.salary_range ? `<div class="text-xs text-gray-500">${job.salary_range}</div>` : ''}[m
+[32m +                  <a href="${job.detail_url}" class="text-indigo-600 text-xs font-medium">View details</a>[m
+[32m +                </div>`[m
+[32m +              );[m
+[32m +              marker.addTo(markersLayer);[m
+[32m +              bounds.push([job.latitude, job.longitude]);[m
+[32m +            });[m
+[32m +[m
+[32m +            if (data.user_location) {[m
+[32m +              const userMarker = L.circleMarker([[m
+[32m +                data.user_location.latitude,[m
+[32m +                data.user_location.longitude,[m
+[32m +              ], {[m
+[32m +                color: '#4f46e5',[m
+[32m +                radius: 8,[m
+[32m +                fillOpacity: 0.7,[m
+[32m +              }).bindPopup('Your location');[m
+[32m +              userMarker.addTo(markersLayer);[m
+[32m +              bounds.push([data.user_location.latitude, data.user_location.longitude]);[m
+[32m +            }[m
+[32m +[m
+[32m +            if (bounds.length) {[m
+[32m +              mapInstance.fitBounds(bounds, { padding: [30, 30] });[m
+[32m +            }[m
+[32m +[m
+[32m +            hasLoaded = true;[m
+[32m +[m
+[32m +            if (data.missing_count > 0) {[m
+[32m +              mapStatus.textContent = `${data.missing_count} job${data.missing_count === 1 ? '' : 's'} missing map coordinates were excluded.`;[m
+[32m +              mapStatus.classList.remove('hidden');[m
+[32m +            } else {[m
+[32m +              mapStatus.classList.add('hidden');[m
+[32m +            }[m
+[32m +[m
+[32m +            if (!data.results.length) {[m
+[32m +              mapStatus.textContent = 'No jobs with map coordinates match your filters.';[m
+[32m +              mapStatus.classList.remove('hidden');[m
+[32m +            }[m
+[32m +[m
+[32m +            setTimeout(() => {[m
+[32m +              mapInstance.invalidateSize();[m
+[32m +            }, 100);[m
+[32m +          })[m
+[32m +          .catch((error) => {[m
+[32m +            console.error(error);[m
+[32m +            mapStatus.textContent = 'There was an error loading the map view. Please try again later.';[m
+[32m +            mapStatus.classList.remove('hidden');[m
+[32m +          });[m
+[32m +      }[m
+[32m +[m
+[32m +      function updateMapData() {[m
+[32m +        if (!mapInstance) {[m
+[32m +          initializeMap();[m
+[32m +          return;[m
+[32m +        }[m
+[32m +        fetch(g
