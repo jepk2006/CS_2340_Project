@@ -26,6 +26,7 @@
       label { font-size: 0.875rem; color: #374151; }
       .dark label { color: #d1d5db; }
     </style>
+    {% block extra_head %}{% endblock %}
 </head>
 <body class="h-full bg-gray-50 text-gray-900 dark:bg-gray-900 dark:text-gray-100">
   <header class="border-b border-gray-200 dark:border-gray-800 bg-white/80 dark:bg-gray-900/60 backdrop-blur sticky top-0 z-40">
@@ -82,6 +83,7 @@
       localStorage.setItem('theme', isDark ? 'dark' : 'light');
     });
   </script>
+  {% block extra_scripts %}{% endblock %}
 </body>
 </html>
 
