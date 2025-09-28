@@ -3,6 +3,19 @@
 <div class="grid grid-cols-1 lg:grid-cols-4 gap-8">
   <aside class="lg:col-span-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-800 rounded-xl p-4 h-fit sticky top-24">
     <h2 class="text-lg font-semibold mb-4">Filters</h2>
+    
+    {% if user.is_authenticated and user.jobseeker_profile.commute_radius %}
+    <div class="mb-4 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+      <div class="flex items-center justify-between">
+        <div>
+          <p class="text-sm font-medium text-blue-900 dark:text-blue-100">Commute Filter Active</p>
+          <p class="text-xs text-blue-700 dark:text-blue-300">Showing jobs within {{ user.jobseeker_profile.commute_radius }} miles</p>
+        </div>
+        <a href="{% url 'accounts:profile_edit' %}" class="text-xs text-blue-600 dark:text-blue-400 hover:underline">Edit</a>
+      </div>
+    </div>
+    {% endif %}
+    
     <form method="get" class="space-y-4">
       <div>
         <label class="block mb-1">Title</label>
@@ -78,6 +91,13 @@
           </div>
           <div class="mt-3 text-sm text-gray-500 flex items-center gap-4">
             <span>{{ job.location_city }} {{ job.location_state }} {{ job.location_country }}</span>
+            {% if job_distances %}
+              {% for job_id, distance in job_distances.items %}
+                {% if job_id == job.pk %}
+                  <span class="text-blue-600 dark:text-blue-400 font-medium">{{ distance }} miles away</span>
+                {% endif %}
+              {% endfor %}
+            {% endif %}
             <span>
               {% if job.min_salary %}${{ job.min_salary }}{% endif %}
               {% if job.max_salary %}- ${{ job.max_salary }}{% endif %}
@@ -86,7 +106,20 @@
           </div>
         </a>
       {% empty %}
-        <div class="text-gray-500">No jobs found.</div>
+        <div class="text-center py-8">
+          <div class="text-gray-500 mb-4">
+            {% if user.is_authenticated and user.jobseeker_profile.commute_radius %}
+              No jobs found within your {{ user.jobseeker_profile.commute_radius }}-mile commute radius.
+            {% else %}
+              No jobs found.
+            {% endif %}
+          </div>
+          {% if user.is_authenticated and not user.jobseeker_profile.commute_radius %}
+            <a href="{% url 'accounts:profile_edit' %}" class="text-blue-600 dark:text-blue-400 hover:underline">
+              Set your commute radius to see jobs within your preferred distance
+            </a>
+          {% endif %}
+        </div>
       {% endfor %}
     </div>
 
