@@ -41,6 +41,7 @@
           <a href="/accounts/profile/edit/" class="hover:text-indigo-600">My Profile</a>
           {% if request.user.is_authenticated %}
             {% if request.user.jobseeker_profile.account_type == 'recruiter' %}
+              <a href="/accounts/talent/" class="hover:text-indigo-600">Talent Search</a>
               <a href="/applications/recruiter/" class="hover:text-indigo-600">Job Applications</a>
             {% else %}
               <a href="/applications/my/" class="hover:text-indigo-600">My Applications</a>
