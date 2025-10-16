@@ -1,9 +1,12 @@
 from django.contrib.auth.decorators import login_required
+from django.contrib import messages
 from django.http import JsonResponse
-from django.shortcuts import get_object_or_404, redirect
-from django.urls import reverse
-from django.views.generic import DetailView
+from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse, reverse_lazy
+from django.views.generic import DetailView, CreateView, UpdateView, ListView
+from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django_filters.views import FilterView
+from django import forms
 import django_filters
 import math
 
@@ -279,9 +282,104 @@ def job_map_data(request):
         }
     )
 
-@login_required
-def job_create(request):
-    # Minimal placeholder to satisfy URL import; redirect to recruiter dashboard
-    return redirect("applications:recruiter_applications")
+# ===== JOB POSTING FORMS AND VIEWS =====
+
+class JobForm(forms.ModelForm):
+    """Form for creating and editing job postings"""
+    class Meta:
+        model = Job
+        fields = [
+            'title', 'company', 'description', 'skills',
+            'location_city', 'location_state', 'location_country',
+            'latitude', 'longitude',
+            'min_salary', 'max_salary', 'work_type', 'visa_sponsorship'
+        ]
+        widgets = {
+            'description': forms.Textarea(attrs={'rows': 6}),
+            'skills': forms.CheckboxSelectMultiple(),
+        }
+        help_texts = {
+            'latitude': 'Optional: Decimal degrees (e.g., 33.7490 for Atlanta)',
+            'longitude': 'Optional: Decimal degrees (e.g., -84.3880 for Atlanta)',
+        }
+
+
+class RecruiterRequiredMixin(LoginRequiredMixin, UserPassesTestMixin):
+    """Mixin to ensure user is authenticated and is a recruiter"""
+    
+    def test_func(self):
+        profile = _get_jobseeker_profile(self.request.user)
+        return profile and profile.account_type == 'recruiter'
+    
+    def handle_no_permission(self):
+        messages.error(self.request, "Only recruiters can access this page.")
+        return redirect('jobs:job_list')
+
+
+class JobCreateView(RecruiterRequiredMixin, CreateView):
+    """View for recruiters to create new job postings"""
+    model = Job
+    form_class = JobForm
+    template_name = 'jobs/job_form.html'
+    success_url = reverse_lazy('jobs:my_jobs')
+    
+    def form_valid(self, form):
+        form.instance.posted_by = self.request.user
+        messages.success(self.request, f"Job posting '{form.instance.title}' has been created successfully!")
+        return super().form_valid(form)
+    
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['form_title'] = 'Post a New Job'
+        context['submit_text'] = 'Post Job'
+        context['is_edit'] = False
+        return context
+
+
+class JobUpdateView(RecruiterRequiredMixin, UpdateView):
+    """View for recruiters to edit their job postings"""
+    model = Job
+    form_class = JobForm
+    template_name = 'jobs/job_form.html'
+    
+    def test_func(self):
+        # Must be a recruiter AND the job owner
+        if not super().test_func():
+            return False
+        job = self.get_object()
+        return job.posted_by == self.request.user
+    
+    def get_success_url(self):
+        return reverse('jobs:job_detail', kwargs={'pk': self.object.pk})
+    
+    def form_valid(self, form):
+        messages.success(self.request, f"Job posting '{form.instance.title}' has been updated successfully!")
+        return super().form_valid(form)
+    
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['form_title'] = 'Edit Job Posting'
+        context['submit_text'] = 'Update Job'
+        context['is_edit'] = True
+        return context
+
+
+class MyJobsListView(RecruiterRequiredMixin, ListView):
+    """View for recruiters to see all their posted jobs"""
+    model = Job
+    template_name = 'jobs/my_jobs.html'
+    context_object_name = 'jobs'
+    paginate_by = 10
+    
+    def get_queryset(self):
+        return Job.objects.filter(posted_by=self.request.user).order_by('-created_at')
+    
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        # Add statistics
+        jobs = self.get_queryset()
+        context['total_jobs'] = jobs.count()
+        context['total_applications'] = Application.objects.filter(job__in=jobs).count()
+        return context
 
 # Create your views here.

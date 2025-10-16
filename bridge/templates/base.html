@@ -38,15 +38,16 @@
         </a>
         <nav class="hidden md:flex items-center gap-6">
           <a href="/jobs/" class="hover:text-indigo-600">Jobs</a>
-          <a href="/accounts/profile/edit/" class="hover:text-indigo-600">My Profile</a>
           {% if request.user.is_authenticated %}
             {% if request.user.jobseeker_profile.account_type == 'recruiter' %}
+              <a href="/jobs/my-jobs/" class="hover:text-indigo-600">My Jobs</a>
               <a href="/accounts/talent/" class="hover:text-indigo-600">Talent Search</a>
               <a href="/applications/recruiter/" class="hover:text-indigo-600">Job Applications</a>
             {% else %}
               <a href="/applications/my/" class="hover:text-indigo-600">My Applications</a>
             {% endif %}
           {% endif %}
+          <a href="/accounts/profile/edit/" class="hover:text-indigo-600">My Profile</a>
         </nav>
         <div class="flex items-center gap-2">
           <button id="themeToggle" class="inline-flex items-center justify-center rounded-md border border-gray-300 dark:border-gray-700 px-3 py-1.5 text-sm hover:bg-gray-100 dark:hover:bg-gray-800" title="Toggle theme">🌓</button>
