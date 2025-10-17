@@ -1,0 +1,301 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-6 max-w-5xl">
+  
+  <!-- Back Button -->
+  <div class="mb-4">
+    <a href="{% url 'applications:recruiter_applications' %}" class="inline-flex items-center text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300">
+      ← Back to Pipeline
+    </a>
+  </div>
+
+  <!-- Flash Messages -->
+  {% if messages %}
+    <div class="mb-6 space-y-2">
+      {% for message in messages %}
+        <div class="{% if message.tags == 'success' %}bg-green-100 border-green-400 text-green-700{% elif message.tags == 'error' %}bg-red-100 border-red-400 text-red-700{% else %}bg-blue-100 border-blue-400 text-blue-700{% endif %} border px-4 py-3 rounded-lg">
+          {{ message }}
+        </div>
+      {% endfor %}
+    </div>
+  {% endif %}
+
+  <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+    
+    <!-- Main Content -->
+    <div class="lg:col-span-2 space-y-6">
+      
+      <!-- Application Header -->
+      <div class="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 border border-gray-200 dark:border-gray-700">
+        <div class="flex items-start justify-between mb-4">
+          <div class="flex-1">
+            <h1 class="text-2xl font-bold text-gray-900 dark:text-white mb-2">
+              {{ application.applicant.get_full_name|default:application.applicant.username }}
+            </h1>
+            <p class="text-gray-600 dark:text-gray-300">{{ application.applicant.email }}</p>
+            
+            {% if application.applicant.jobseeker_profile.headline %}
+              <p class="text-gray-700 dark:text-gray-300 mt-2 italic">
+                {{ application.applicant.jobseeker_profile.headline }}
+              </p>
+            {% endif %}
+          </div>
+          
+          <!-- Flag Button -->
+          {% if is_recruiter %}
+            <form method="post" action="{% url 'applications:toggle_flag' application.id %}">
+              {% csrf_token %}
+              <button type="submit" class="text-3xl hover:scale-110 transition-transform" title="{% if application.flagged %}Unflag{% else %}Flag{% endif %}">
+                {% if application.flagged %}{% else %}☆{% endif %}
+              </button>
+            </form>
+          {% endif %}
+        </div>
+
+        <!-- Application Info -->
+        <div class="grid grid-cols-2 gap-4 mt-4 pt-4 border-t border-gray-200 dark:border-gray-600">
+          <div>
+            <div class="text-sm text-gray-500 dark:text-gray-400">Applied To</div>
+            <div class="font-semibold text-gray-900 dark:text-white">{{ application.job.title }}</div>
+            <div class="text-sm text-gray-600 dark:text-gray-300">{{ application.job.company }}</div>
+          </div>
+          <div>
+            <div class="text-sm text-gray-500 dark:text-gray-400">Applied On</div>
+            <div class="font-semibold text-gray-900 dark:text-white">{{ application.created_at|date:"M d, Y" }}</div>
+            <div class="text-sm text-gray-600 dark:text-gray-300">{{ application.created_at|timesince }} ago</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Applicant Note -->
+      {% if application.note %}
+        <div class="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 border border-gray-200 dark:border-gray-700">
+          <h2 class="text-lg font-semibold text-gray-900 dark:text-white mb-3">Cover Letter / Note</h2>
+          <div class="prose dark:prose-invert max-w-none">
+            <p class="text-gray-700 dark:text-gray-300 whitespace-pre-wrap">{{ application.note }}</p>
+          </div>
+        </div>
+      {% endif %}
+
+      <!-- Profile Information -->
+      <div class="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 border border-gray-200 dark:border-gray-700">
+        <h2 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Profile Information</h2>
+        
+        <!-- Bio -->
+        {% if application.applicant.jobseeker_profile.bio %}
+          <div class="mb-4">
+            <h3 class="text-sm font-medium text-gray-500 dark:text-gray-400 mb-2">Bio</h3>
+            <p class="text-gray-700 dark:text-gray-300 whitespace-pre-wrap">{{ application.applicant.jobseeker_profile.bio }}</p>
+          </div>
+        {% endif %}
+
+        <!-- Skills -->
+        {% if application.applicant.jobseeker_profile.skills.exists %}
+          <div class="mb-4">
+            <h3 class="text-sm font-medium text-gray-500 dark:text-gray-400 mb-2">Skills</h3>
+            <div class="flex flex-wrap gap-2">
+              {% for skill in application.applicant.jobseeker_profile.skills.all %}
+                <span class="bg-indigo-100 dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300 px-3 py-1 rounded-full text-sm">
+                  {{ skill.name }}
+                </span>
+              {% endfor %}
+            </div>
+          </div>
+        {% endif %}
+
+        <!-- Education -->
+        {% if application.applicant.jobseeker_profile.education %}
+          <div class="mb-4">
+            <h3 class="text-sm font-medium text-gray-500 dark:text-gray-400 mb-2">Education</h3>
+            <p class="text-gray-700 dark:text-gray-300 whitespace-pre-wrap">{{ application.applicant.jobseeker_profile.education }}</p>
+          </div>
+        {% endif %}
+
+        <!-- Experience -->
+        {% if application.applicant.jobseeker_profile.experience %}
+          <div class="mb-4">
+            <h3 class="text-sm font-medium text-gray-500 dark:text-gray-400 mb-2">Experience</h3>
+            <p class="text-gray-700 dark:text-gray-300 whitespace-pre-wrap">{{ application.applicant.jobseeker_profile.experience }}</p>
+          </div>
+        {% endif %}
+
+        <!-- Location -->
+        {% if application.applicant.jobseeker_profile.location_city or application.applicant.jobseeker_profile.location_state %}
+          <div class="mb-4">
+            <h3 class="text-sm font-medium text-gray-500 dark:text-gray-400 mb-2">Location</h3>
+            <p class="text-gray-700 dark:text-gray-300">
+              {% if application.applicant.jobseeker_profile.location_city %}{{ application.applicant.jobseeker_profile.location_city }}{% endif %}
+              {% if application.applicant.jobseeker_profile.location_state %}, {{ application.applicant.jobseeker_profile.location_state }}{% endif %}
+              {% if application.applicant.jobseeker_profile.location_country %}, {{ application.applicant.jobseeker_profile.location_country }}{% endif %}
+            </p>
+          </div>
+        {% endif %}
+
+        <!-- Links -->
+        <div class="flex flex-wrap gap-3 mt-4">
+          {% if application.applicant.jobseeker_profile.portfolio_url %}
+            <a href="{{ application.applicant.jobseeker_profile.portfolio_url }}" target="_blank" class="inline-flex items-center px-3 py-1 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 text-sm">
+              🌐 Portfolio
+            </a>
+          {% endif %}
+          {% if application.applicant.jobseeker_profile.linkedin_url %}
+            <a href="{{ application.applicant.jobseeker_profile.linkedin_url }}" target="_blank" class="inline-flex items-center px-3 py-1 bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 rounded-lg hover:bg-blue-200 dark:hover:bg-blue-800 text-sm">
+              💼 LinkedIn
+            </a>
+          {% endif %}
+          {% if application.applicant.jobseeker_profile.github_url %}
+            <a href="{{ application.applicant.jobseeker_profile.github_url }}" target="_blank" class="inline-flex items-center px-3 py-1 bg-gray-800 dark:bg-gray-600 text-white rounded-lg hover:bg-gray-700 dark:hover:bg-gray-500 text-sm">
+              💻 GitHub
+            </a>
+          {% endif %}
+          {% if application.applicant.jobseeker_profile.show_email %}
+            <a href="mailto:{{ application.applicant.email }}" class="inline-flex items-center px-3 py-1 bg-green-100 dark:bg-green-900/50 text-green-700 dark:text-green-300 rounded-lg hover:bg-green-200 dark:hover:bg-green-800 text-sm">
+              ✉️ Email
+            </a>
+          {% endif %}
+        </div>
+      </div>
+
+      <!-- Recruiter Notes (Recruiter Only) -->
+      {% if is_recruiter %}
+        <div class="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 border border-gray-200 dark:border-gray-700">
+          <h2 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Internal Notes</h2>
+          <form method="post">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="update_notes">
+            {{ notes_form.recruiter_notes }}
+            <button type="submit" class="mt-3 bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition">
+              Save Notes
+            </button>
+          </form>
+        </div>
+      {% endif %}
+
+    </div>
+
+    <!-- Sidebar -->
+    <div class="space-y-6">
+      
+      <!-- Current Status -->
+      <div class="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 border border-gray-200 dark:border-gray-700">
+        <h2 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Status</h2>
+        
+        <div class="mb-4">
+          <div class="inline-block px-3 py-1 rounded-full text-sm font-medium 
+            {% if application.status == 'applied' %}bg-blue-100 text-blue-700{% elif application.status == 'review' %}bg-yellow-100 text-yellow-700{% elif application.status == 'interview' %}bg-orange-100 text-orange-700{% elif application.status == 'offer' %}bg-green-100 text-green-700{% else %}bg-gray-100 text-gray-700{% endif %}">
+            {{ application.get_status_display }}
+          </div>
+        </div>
+
+        <div class="text-sm text-gray-600 dark:text-gray-400 mb-4">
+          📅 {{ application.days_in_current_stage }} day{% if application.days_in_current_stage != 1 %}s{% endif %} in this stage
+        </div>
+
+        {% if is_recruiter %}
+          <form method="post">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="update_status">
+            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Change Status</label>
+            {{ status_form.status }}
+            <button type="submit" class="mt-3 w-full bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition">
+              Update Status
+            </button>
+          </form>
+        {% endif %}
+      </div>
+
+      <!-- Priority (Recruiter Only) -->
+      {% if is_recruiter %}
+        <div class="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 border border-gray-200 dark:border-gray-700">
+          <h2 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Priority</h2>
+          
+          <div class="mb-4">
+            <span class="inline-block px-3 py-1 rounded-full text-sm font-medium 
+              {% if application.priority == 'high' %}bg-red-100 text-red-700{% elif application.priority == 'medium' %}bg-yellow-100 text-yellow-700{% else %}bg-gray-100 text-gray-700{% endif %}">
+              {{ application.get_priority_display }}
+            </span>
+          </div>
+
+          <form method="post">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="update_priority">
+            <div class="space-y-2">
+              {% for value, label in priorities %}
+                <label class="flex items-center space-x-2 cursor-pointer">
+                  <input type="radio" name="priority" value="{{ value }}" {% if application.priority == value %}checked{% endif %} class="text-indigo-600">
+                  <span class="text-sm text-gray-700 dark:text-gray-300">{{ label }}</span>
+                </label>
+              {% endfor %}
+            </div>
+            <button type="submit" class="mt-3 w-full bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition">
+              Update Priority
+            </button>
+          </form>
+        </div>
+      {% endif %}
+
+      <!-- Timeline -->
+      <div class="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 border border-gray-200 dark:border-gray-700">
+        <h2 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Timeline</h2>
+        
+        <div class="space-y-3">
+          <div class="flex items-start space-x-3">
+            <div class="flex-shrink-0 w-2 h-2 mt-2 bg-blue-500 rounded-full"></div>
+            <div>
+              <div class="text-sm font-medium text-gray-900 dark:text-white">Application Submitted</div>
+              <div class="text-xs text-gray-500 dark:text-gray-400">{{ application.created_at|date:"M d, Y g:i A" }}</div>
+            </div>
+          </div>
+          
+          {% if application.stage_changed_at and application.stage_changed_at != application.created_at %}
+            <div class="flex items-start space-x-3">
+              <div class="flex-shrink-0 w-2 h-2 mt-2 bg-green-500 rounded-full"></div>
+              <div>
+                <div class="text-sm font-medium text-gray-900 dark:text-white">Status Updated</div>
+                <div class="text-xs text-gray-500 dark:text-gray-400">{{ application.stage_changed_at|date:"M d, Y g:i A" }}</div>
+              </div>
+            </div>
+          {% endif %}
+          
+          <div class="flex items-start space-x-3">
+            <div class="flex-shrink-0 w-2 h-2 mt-2 bg-gray-300 rounded-full"></div>
+            <div>
+              <div class="text-sm font-medium text-gray-900 dark:text-white">Last Updated</div>
+              <div class="text-xs text-gray-500 dark:text-gray-400">{{ application.updated_at|date:"M d, Y g:i A" }}</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+</div>
+
+<style>
+  select, textarea {
+    width: 100%;
+    padding: 0.5rem;
+    border: 1px solid #d1d5db;
+    border-radius: 0.5rem;
+    background-color: white;
+  }
+  
+  .dark select,
+  .dark textarea {
+    background-color: #374151;
+    border-color: #4b5563;
+    color: white;
+  }
+
+  select:focus,
+  textarea:focus {
+    outline: none;
+    ring: 2px;
+    ring-color: #4f46e5;
+    border-color: #4f46e5;
+  }
+</style>
+{% endblock %}
+

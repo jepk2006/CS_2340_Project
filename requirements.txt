@@ -1,0 +1,12 @@
+# Core Django Framework
+Django==5.2.6
+
+# Django Filters (already in your INSTALLED_APPS)
+django-filter==24.3
+
+# Database (SQLite is built-in with Python, no package needed)
+
+# For production deployment (optional, but recommended)
+# gunicorn==21.2.0
+# psycopg2-binary==2.9.9  # If you switch to PostgreSQL later
+
