@@ -9,8 +9,8 @@ from django.urls import reverse
 from django.http import JsonResponse
 from django.views.decorators.http import require_POST
 
-from .models import JobSeekerProfile, SavedSearch, TalentMessage
-from .forms import SavedSearchForm, JobSeekerProfileForm
+from .models import JobSeekerProfile, SavedSearch, TalentMessage, Conversation, Message
+from .forms import SavedSearchForm, JobSeekerProfileForm, MessageForm
 from jobs.models import Skill
 from jobs.decorators import recruiter_required
 
@@ -331,5 +331,120 @@ def get_unread_messages_count(request):
     """Get count of unread messages for the current recruiter"""
     count = TalentMessage.objects.filter(recruiter=request.user, is_read=False).count()
     return JsonResponse({'unread_count': count})
+
+
+# Messaging Views
+
+@login_required
+def conversations_list(request):
+    """List all conversations for the current user"""
+    if request.user.jobseeker_profile.account_type == JobSeekerProfile.AccountType.RECRUITER:
+        # Recruiters see conversations they started
+        conversations = Conversation.objects.filter(recruiter=request.user).select_related('candidate', 'candidate__jobseeker_profile').prefetch_related('messages')
+    else:
+        # Candidates see conversations where they are the candidate
+        conversations = Conversation.objects.filter(candidate=request.user).select_related('recruiter', 'recruiter__jobseeker_profile').prefetch_related('messages')
+    
+    # Add unread counts for each conversation
+    for conversation in conversations:
+        conversation.unread_count = conversation.get_unread_count_for_user(request.user)
+        conversation.latest_message = conversation.get_latest_message()
+    
+    context = {
+        'conversations': conversations,
+        'is_recruiter': request.user.jobseeker_profile.account_type == JobSeekerProfile.AccountType.RECRUITER,
+    }
+    return render(request, 'accounts/conversations_list.html', context)
+
+
+@login_required
+def conversation_detail(request, conversation_id):
+    """View a specific conversation and its messages"""
+    conversation = get_object_or_404(Conversation, id=conversation_id)
+    
+    # Check if user is part of this conversation
+    if request.user not in [conversation.recruiter, conversation.candidate]:
+        messages.error(request, "You don't have permission to view this conversation.")
+        return redirect('accounts:conversations_list')
+    
+    # Get all messages in this conversation
+    message_list = conversation.messages.all()
+    
+    # Mark messages as read when viewed
+    unread_messages = message_list.filter(is_read=False).exclude(sender=request.user)
+    unread_messages.update(is_read=True)
+    
+    # Create form for new messages
+    if request.method == 'POST':
+        form = MessageForm(request.POST)
+        if form.is_valid():
+            message = form.save(commit=False)
+            message.conversation = conversation
+            message.sender = request.user
+            message.save()
+            return redirect('accounts:conversation_detail', conversation_id=conversation.id)
+    else:
+        form = MessageForm()
+    
+    # Determine the other participant
+    other_user = conversation.candidate if request.user == conversation.recruiter else conversation.recruiter
+    
+    context = {
+        'conversation': conversation,
+        'message_list': message_list,
+        'form': form,
+        'other_user': other_user,
+        'is_recruiter': request.user.jobseeker_profile.account_type == JobSeekerProfile.AccountType.RECRUITER,
+    }
+    return render(request, 'accounts/conversation_detail.html', context)
+
+
+@recruiter_required
+def start_conversation(request, candidate_id):
+    """Start a new conversation with a candidate (recruiters only)"""
+    candidate = get_object_or_404(get_user_model(), id=candidate_id)
+    
+    # Check if candidate is actually a job seeker
+    if not hasattr(candidate, 'jobseeker_profile') or candidate.jobseeker_profile.account_type != JobSeekerProfile.AccountType.JOB_SEEKER:
+        messages.error(request, "You can only message job seekers.")
+        return redirect('accounts:recruiter_talent_search')
+    
+    # Get or create conversation
+    conversation, created = Conversation.objects.get_or_create(
+        recruiter=request.user,
+        candidate=candidate
+    )
+    
+    if created:
+        messages.success(request, f"Started conversation with {candidate.username}")
+    else:
+        messages.info(request, f"Resumed conversation with {candidate.username}")
+    
+    return redirect('accounts:conversation_detail', conversation_id=conversation.id)
+
+
+@login_required
+def send_message(request, conversation_id):
+    """Send a message in a conversation"""
+    conversation = get_object_or_404(Conversation, id=conversation_id)
+    
+    # Check if user is part of this conversation
+    if request.user not in [conversation.recruiter, conversation.candidate]:
+        messages.error(request, "You don't have permission to send messages in this conversation.")
+        return redirect('accounts:conversations_list')
+    
+    if request.method == 'POST':
+        form = MessageForm(request.POST)
+        if form.is_valid():
+            message = form.save(commit=False)
+            message.conversation = conversation
+            message.sender = request.user
+            message.save()
+            messages.success(request, "Message sent successfully!")
+        else:
+            messages.error(request, "Failed to send message. Please try again.")
+    
+    return redirect('accounts:conversation_detail', conversation_id=conversation.id)
+
 
 # Create your views here.

@@ -1,5 +1,5 @@
 from django import forms
-from .models import SavedSearch, JobSeekerProfile
+from .models import SavedSearch, JobSeekerProfile, Message
 from jobs.models import Skill
 
 
@@ -55,3 +55,21 @@ class JobSeekerProfileForm(forms.ModelForm):
             "show_email",
             "account_type",
         ]
+
+
+class MessageForm(forms.ModelForm):
+    """Form for composing and sending messages"""
+    
+    class Meta:
+        model = Message
+        fields = ['content']
+        widgets = {
+            'content': forms.Textarea(attrs={
+                'rows': 4, 
+                'placeholder': 'Type your message here...',
+                'class': 'w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500'
+            })
+        }
+        labels = {
+            'content': 'Message'
+        }

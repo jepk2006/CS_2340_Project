@@ -18,6 +18,12 @@ urlpatterns = [
     path("talent/messages/", views.talent_messages, name="talent_messages"),
     path("talent/check-matches/", views.check_new_matches, name="check_new_matches"),
     path("talent/unread-count/", views.get_unread_messages_count, name="unread_messages_count"),
+    
+    # Messaging URLs
+    path("messages/", views.conversations_list, name="conversations_list"),
+    path("messages/<int:conversation_id>/", views.conversation_detail, name="conversation_detail"),
+    path("messages/start/<int:candidate_id>/", views.start_conversation, name="start_conversation"),
+    path("messages/<int:conversation_id>/send/", views.send_message, name="send_message"),
 ]
 
 

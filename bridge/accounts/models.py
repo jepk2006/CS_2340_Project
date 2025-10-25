@@ -164,4 +164,50 @@ class TalentMessage(models.Model):
     def __str__(self):
         return f"{self.title} - {self.recruiter.username}"
 
+class Conversation(models.Model):
+    """Model for conversations between recruiters and candidates"""
+    recruiter = models.ForeignKey(get_user_model(), on_delete=models.CASCADE, related_name="recruiter_conversations")
+    candidate = models.ForeignKey(get_user_model(), on_delete=models.CASCADE, related_name="candidate_conversations")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        unique_together = ['recruiter', 'candidate']
+        ordering = ['-updated_at']
+    
+    def __str__(self):
+        return f"Conversation: {self.recruiter.username} <-> {self.candidate.username}"
+    
+    def get_latest_message(self):
+        """Get the most recent message in this conversation"""
+        return self.messages.first()
+    
+    def get_unread_count_for_user(self, user):
+        """Get count of unread messages for a specific user"""
+        return self.messages.filter(
+            sender=user if user == self.recruiter else self.recruiter,
+            is_read=False
+        ).count()
+
+
+class Message(models.Model):
+    """Model for individual messages in conversations"""
+    conversation = models.ForeignKey(Conversation, on_delete=models.CASCADE, related_name="messages")
+    sender = models.ForeignKey(get_user_model(), on_delete=models.CASCADE, related_name="sent_messages")
+    content = models.TextField()
+    is_read = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        ordering = ['created_at']
+    
+    def __str__(self):
+        return f"Message from {self.sender.username}: {self.content[:50]}..."
+    
+    def mark_as_read(self):
+        """Mark this message as read"""
+        self.is_read = True
+        self.save(update_fields=['is_read'])
+
+
 # Create your models here.
