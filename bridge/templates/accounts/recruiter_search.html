@@ -1,8 +1,56 @@
 {% extends "base.html" %}
 {% block content %}
+<!-- Tab Navigation -->
+<div class="mb-6">
+  <div class="border-b border-gray-200 dark:border-gray-700">
+    <nav class="-mb-px flex space-x-8">
+      <a href="{% url 'accounts:recruiter_talent_search' %}" 
+         class="border-b-2 border-indigo-500 text-indigo-600 dark:text-indigo-400 py-2 px-1 text-sm font-medium">
+        🔍 Search Talent
+      </a>
+      <a href="{% url 'accounts:talent_messages' %}" 
+         class="border-b-2 border-transparent text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 hover:border-gray-300 py-2 px-1 text-sm font-medium relative">
+        📬 Messages
+        <span id="unreadBadge" class="hidden absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center"></span>
+      </a>
+      <a href="{% url 'accounts:saved_searches' %}" 
+         class="border-b-2 border-transparent text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 hover:border-gray-300 py-2 px-1 text-sm font-medium">
+        💾 Saved Searches
+      </a>
+    </nav>
+  </div>
+</div>
+
 <div class="grid grid-cols-1 lg:grid-cols-4 gap-6">
   <aside class="lg:col-span-1 space-y-4">
-    <form method="get" class="space-y-4">
+    <!-- Saved Searches Section -->
+    <div class="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-800 rounded-xl p-4">
+      <div class="flex items-center justify-between mb-3">
+        <h3 class="font-medium">Saved Searches</h3>
+        <a href="{% url 'accounts:saved_searches' %}" class="text-xs text-indigo-600 dark:text-indigo-400 hover:underline">Manage All</a>
+      </div>
+      {% if saved_searches %}
+        <div class="space-y-2">
+          {% for search in saved_searches|slice:":5" %}
+            <div class="flex items-center justify-between">
+              <a href="?saved_search={{ search.id }}" class="text-sm text-gray-700 dark:text-gray-300 hover:text-indigo-600 dark:hover:text-indigo-400 truncate flex-1">
+                {{ search.name }}
+              </a>
+              <span class="text-xs text-gray-500 ml-2">{{ search.get_matching_profiles.count }}</span>
+            </div>
+          {% endfor %}
+          {% if saved_searches.count > 5 %}
+            <div class="text-xs text-gray-500 text-center pt-2 border-t border-gray-200 dark:border-gray-700">
+              +{{ saved_searches.count|add:"-5" }} more
+            </div>
+          {% endif %}
+        </div>
+      {% else %}
+        <p class="text-sm text-gray-500">No saved searches yet</p>
+      {% endif %}
+    </div>
+
+    <form method="get" class="space-y-4" id="searchForm">
       <div>
         <label class="block text-sm mb-1">Keywords</label>
         <input type="text" name="q" value="{{ query }}" placeholder="Search by name, headline, bio..." />
@@ -69,12 +117,24 @@
         {% endblock %}
       </div>
       <button class="w-full bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-500">Apply filters</button>
+      
+      <!-- Save Search Button -->
+      {% if has_search_criteria %}
+        <button type="button" onclick="showSaveSearchModal()" class="w-full bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-500 mt-2">
+          💾 Save This Search
+        </button>
+      {% endif %}
     </form>
   </aside>
 
   <section class="lg:col-span-3">
     <div class="flex items-center justify-between mb-4">
-      <h1 class="text-xl font-semibold">Talent Search</h1>
+      <div>
+        <h1 class="text-xl font-semibold">Talent Search</h1>
+        {% if current_saved_search %}
+          <p class="text-sm text-gray-500">Showing results for: <span class="font-medium text-indigo-600 dark:text-indigo-400">{{ current_saved_search.name }}</span></p>
+        {% endif %}
+      </div>
       <span class="text-sm text-gray-500">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
     </div>
     <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
@@ -115,6 +175,111 @@
     </div>
   </section>
 </div>
+
+<!-- Save Search Modal -->
+<div id="saveSearchModal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50">
+  <div class="flex items-center justify-center min-h-screen p-4">
+    <div class="bg-white dark:bg-gray-800 rounded-xl p-6 w-full max-w-md">
+      <h3 class="text-lg font-semibold mb-4">Save This Search</h3>
+      <form id="saveSearchForm">
+        {% csrf_token %}
+        <div class="space-y-4">
+          <div>
+            <label class="block text-sm font-medium mb-1">Search Name *</label>
+            <input type="text" id="searchName" name="name" required class="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md" placeholder="e.g., Senior Python Developers in Atlanta">
+          </div>
+          <div class="text-sm text-gray-600 dark:text-gray-400">
+            <p>💡 New matches will appear in your Messages tab. Check regularly for updates!</p>
+          </div>
+        </div>
+        <div class="flex items-center gap-3 mt-6">
+          <button type="submit" class="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-500">Save Search</button>
+          <button type="button" onclick="hideSaveSearchModal()" class="px-4 py-2 rounded-md border border-gray-300 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-700">Cancel</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script>
+function showSaveSearchModal() {
+  document.getElementById('saveSearchModal').classList.remove('hidden');
+}
+
+function hideSaveSearchModal() {
+  document.getElementById('saveSearchModal').classList.add('hidden');
+}
+
+document.getElementById('saveSearchForm').addEventListener('submit', function(e) {
+  e.preventDefault();
+  
+  const formData = new FormData();
+  const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+  const searchName = document.getElementById('searchName').value;
+  
+  formData.append('csrfmiddlewaretoken', csrfToken);
+  formData.append('name', searchName);
+  formData.append('query', document.querySelector('[name="q"]').value || '');
+  formData.append('city', document.querySelector('[name="city"]').value || '');
+  formData.append('state', document.querySelector('[name="state"]').value || '');
+  formData.append('country', document.querySelector('[name="country"]').value || '');
+  
+  // Add selected skills from checkboxes
+  const selectedSkills = document.querySelectorAll('input[name="skills"]:checked');
+  selectedSkills.forEach(function(checkbox) {
+    formData.append('skills', checkbox.value);
+  });
+  
+  fetch('{% url "accounts:save_search" %}', {
+    method: 'POST',
+    body: formData
+  })
+  .then(response => response.json())
+  .then(data => {
+    if (data.success) {
+      alert(data.message);
+      hideSaveSearchModal();
+      location.reload();
+    } else {
+      alert('Error: ' + data.error);
+    }
+  })
+  .catch(error => {
+    console.error('Error:', error);
+    alert('An error occurred while saving the search.');
+  });
+});
+
+// Close modal when clicking outside
+document.getElementById('saveSearchModal').addEventListener('click', function(e) {
+  if (e.target === this) {
+    hideSaveSearchModal();
+  }
+});
+
+// Check for unread messages and update badge
+function updateUnreadBadge() {
+  fetch('{% url "accounts:unread_messages_count" %}')
+    .then(response => response.json())
+    .then(data => {
+      const badge = document.getElementById('unreadBadge');
+      if (data.unread_count > 0) {
+        badge.textContent = data.unread_count > 99 ? '99+' : data.unread_count;
+        badge.classList.remove('hidden');
+      } else {
+        badge.classList.add('hidden');
+      }
+    })
+    .catch(error => console.error('Error checking unread messages:', error));
+}
+
+// Update badge on page load and periodically
+document.addEventListener('DOMContentLoaded', function() {
+  updateUnreadBadge();
+  // Check every 30 seconds for new messages
+  setInterval(updateUnreadBadge, 30000);
+});
+</script>
 {% endblock %}
 
 

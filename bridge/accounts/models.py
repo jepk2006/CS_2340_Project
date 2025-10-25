@@ -1,5 +1,6 @@
 from django.db import models
 from django.contrib.auth import get_user_model
+from django.utils import timezone
 from jobs.models import Skill, Job
 
 
@@ -58,5 +59,109 @@ class JobSeekerProfile(models.Model):
         recommended_jobs = Job.objects.filter(skills__in=seeker_skills).distinct()
 
         return recommended_jobs
+
+
+class SavedSearch(models.Model):
+    """Model to store recruiter's saved talent searches"""
+    recruiter = models.ForeignKey(get_user_model(), on_delete=models.CASCADE, related_name="saved_searches")
+    name = models.CharField(max_length=200, help_text="Name for this saved search")
+    
+    # Search criteria fields
+    query = models.TextField(blank=True, help_text="Keywords search")
+    skills = models.ManyToManyField(Skill, blank=True, related_name="saved_searches")
+    location_city = models.CharField(max_length=100, blank=True)
+    location_state = models.CharField(max_length=100, blank=True)
+    location_country = models.CharField(max_length=100, blank=True)
+    
+    # Notification settings
+    last_check = models.DateTimeField(null=True, blank=True, help_text="Last time matches were checked")
+    
+    # Metadata
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    is_active = models.BooleanField(default=True, help_text="Whether to check for new matches")
+    
+    class Meta:
+        ordering = ['-updated_at']
+        unique_together = ['recruiter', 'name']
+    
+    def __str__(self):
+        return f"{self.recruiter.username} - {self.name}"
+    
+    def get_matching_profiles(self):
+        """Get profiles that match this saved search criteria"""
+        from django.db.models import Q
+        
+        profiles = JobSeekerProfile.objects.filter(
+            visibility__in=[JobSeekerProfile.Visibility.PUBLIC, JobSeekerProfile.Visibility.RECRUITERS],
+            account_type=JobSeekerProfile.AccountType.JOB_SEEKER
+        )
+        
+        # Apply query filter
+        if self.query:
+            profiles = profiles.filter(
+                Q(user__username__icontains=self.query)
+                | Q(headline__icontains=self.query)
+                | Q(bio__icontains=self.query)
+                | Q(education__icontains=self.query)
+                | Q(experience__icontains=self.query)
+                | Q(portfolio_url__icontains=self.query)
+                | Q(linkedin_url__icontains=self.query)
+                | Q(github_url__icontains=self.query)
+            )
+        
+        # Apply skills filter
+        if self.skills.exists():
+            profiles = profiles.filter(skills__in=self.skills.all()).distinct()
+        
+        # Apply location filters
+        if self.location_city:
+            profiles = profiles.filter(location_city__icontains=self.location_city)
+        if self.location_state:
+            profiles = profiles.filter(location_state__icontains=self.location_state)
+        if self.location_country:
+            profiles = profiles.filter(location_country__icontains=self.location_country)
+        
+        # Only show candidates with at least one skill
+        profiles = profiles.filter(skills__isnull=False).select_related("user").prefetch_related("skills").distinct()
+        
+        return profiles
+    
+    def get_new_matches_since_last_check(self):
+        """Get profiles that match and have been updated since last check"""
+        profiles = self.get_matching_profiles()
+        
+        if self.last_check:
+            profiles = profiles.filter(updated_at__gt=self.last_check)
+        
+        return profiles
+    
+    def mark_checked(self):
+        """Mark that matches have been checked for this search"""
+        self.last_check = timezone.now()
+        self.save(update_fields=['last_check'])
+
+
+class TalentMessage(models.Model):
+    """Model for in-app messages about new talent matches"""
+    class MessageType(models.TextChoices):
+        NEW_MATCH = "new_match", "New Match"
+        PROFILE_UPDATE = "profile_update", "Profile Update"
+    
+    recruiter = models.ForeignKey(get_user_model(), on_delete=models.CASCADE, related_name="talent_messages")
+    saved_search = models.ForeignKey(SavedSearch, on_delete=models.CASCADE, related_name="messages")
+    profile = models.ForeignKey(JobSeekerProfile, on_delete=models.CASCADE)
+    message_type = models.CharField(max_length=20, choices=MessageType.choices, default=MessageType.NEW_MATCH)
+    title = models.CharField(max_length=200)
+    content = models.TextField()
+    is_read = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        ordering = ['-created_at']
+        unique_together = ['saved_search', 'profile', 'message_type']
+    
+    def __str__(self):
+        return f"{self.title} - {self.recruiter.username}"
 
 # Create your models here.

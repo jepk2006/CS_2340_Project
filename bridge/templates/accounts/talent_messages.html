@@ -1,0 +1,184 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="max-w-6xl mx-auto">
+  <div class="flex items-center justify-between mb-6">
+    <div>
+      <h1 class="text-2xl font-semibold">Talent Messages</h1>
+      <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">New matches and updates for your saved searches</p>
+    </div>
+    <div class="flex items-center gap-3">
+      <button onclick="checkNewMatches()" id="checkMatchesBtn" 
+              class="inline-flex items-center justify-center bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-500 font-medium">
+        🔄 Check for New Matches
+      </button>
+      <a href="{% url 'accounts:recruiter_talent_search' %}" 
+         class="inline-flex items-center justify-center bg-gray-600 text-white px-4 py-2 rounded-md hover:bg-gray-500 font-medium">
+        Back to Search
+      </a>
+    </div>
+  </div>
+
+  {% if page_obj.object_list %}
+    <div class="space-y-4">
+      {% for message in page_obj.object_list %}
+        <div class="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-800 rounded-xl p-5 {% if not message.is_read %}border-l-4 border-l-indigo-500{% endif %}">
+          <div class="flex items-start justify-between">
+            <div class="flex-1">
+              <div class="flex items-center gap-3 mb-2">
+                <h3 class="font-semibold text-lg">{{ message.title }}</h3>
+                {% if not message.is_read %}
+                  <span class="text-xs bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 px-2 py-1 rounded-full">
+                    New
+                  </span>
+                {% endif %}
+                <span class="text-xs bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 px-2 py-1 rounded-full">
+                  {{ message.get_message_type_display }}
+                </span>
+              </div>
+              
+              <div class="text-sm text-gray-600 dark:text-gray-300 mb-3">
+                {{ message.content }}
+              </div>
+              
+              <!-- Candidate Information -->
+              <div class="bg-gray-50 dark:bg-gray-700 rounded-lg p-4 mb-3">
+                <div class="flex items-center justify-between mb-2">
+                  <div class="font-medium">{{ message.profile.user.username }}</div>
+                  <div class="text-xs text-gray-500">
+                    {{ message.profile.location_city }}{% if message.profile.location_state %}, {{ message.profile.location_state }}{% endif %}
+                  </div>
+                </div>
+                
+                {% if message.profile.headline %}
+                  <div class="text-sm text-gray-600 dark:text-gray-300 mb-2">{{ message.profile.headline }}</div>
+                {% endif %}
+                
+                {% if message.profile.bio %}
+                  <p class="text-sm text-gray-600 dark:text-gray-300 mb-3 line-clamp-2">{{ message.profile.bio }}</p>
+                {% endif %}
+                
+                {% if message.profile.skills.all %}
+                  <div class="flex flex-wrap gap-1">
+                    {% for skill in message.profile.skills.all|slice:":6" %}
+                      <span class="text-xs px-2 py-0.5 rounded-full bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300">
+                        {{ skill.name }}
+                      </span>
+                    {% endfor %}
+                    {% if message.profile.skills.count > 6 %}
+                      <span class="text-xs text-gray-500">+{{ message.profile.skills.count|add:"-6" }} more</span>
+                    {% endif %}
+                  </div>
+                {% endif %}
+              </div>
+              
+              <!-- Search Information -->
+              <div class="flex items-center gap-4 text-sm text-gray-500 dark:text-gray-400">
+                <span>📋 From search: <strong>{{ message.saved_search.name }}</strong></span>
+                <span>📅 {{ message.created_at|date:"M d, Y H:i" }}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      {% endfor %}
+    </div>
+
+    <!-- Pagination -->
+    {% if page_obj.has_other_pages %}
+      <div class="flex items-center justify-between mt-6 pt-4 border-t border-gray-200 dark:border-gray-700">
+        <div>
+          {% if page_obj.has_previous %}
+            <a class="px-4 py-2 rounded border border-gray-300 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-700" 
+               href="?page={{ page_obj.previous_page_number }}">
+              Previous
+            </a>
+          {% endif %}
+        </div>
+        <div class="text-sm text-gray-600 dark:text-gray-400">
+          Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}
+        </div>
+        <div>
+          {% if page_obj.has_next %}
+            <a class="px-4 py-2 rounded border border-gray-300 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-700" 
+               href="?page={{ page_obj.next_page_number }}">
+              Next
+            </a>
+          {% endif %}
+        </div>
+      </div>
+    {% endif %}
+  {% else %}
+    <div class="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-800 rounded-xl p-12 text-center">
+      <div class="text-gray-400 dark:text-gray-500 mb-4">
+        <svg class="w-16 h-16 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
+        </svg>
+      </div>
+      <h3 class="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">No messages yet</h3>
+      <p class="text-gray-500 dark:text-gray-400 mb-6">When new candidates match your saved searches, you'll see messages here.</p>
+      <div class="space-y-3">
+        <button onclick="checkNewMatches()" 
+                class="inline-flex items-center justify-center bg-indigo-600 text-white px-6 py-3 rounded-md hover:bg-indigo-500 font-medium">
+          Check for New Matches
+        </button>
+        <div>
+          <a href="{% url 'accounts:recruiter_talent_search' %}" 
+             class="text-indigo-600 dark:text-indigo-400 hover:underline">
+            Create a saved search
+          </a>
+        </div>
+      </div>
+    </div>
+  {% endif %}
+</div>
+
+<script>
+function checkNewMatches() {
+  const btn = document.getElementById('checkMatchesBtn');
+  const originalText = btn.innerHTML;
+  
+  btn.innerHTML = '⏳ Checking...';
+  btn.disabled = true;
+  
+  fetch('{% url "accounts:check_new_matches" %}', {
+    method: 'POST',
+    headers: {
+      'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+      'Content-Type': 'application/json',
+    },
+  })
+  .then(response => response.json())
+  .then(data => {
+    if (data.success) {
+      if (data.new_messages > 0) {
+        alert(data.message);
+        location.reload(); // Refresh to show new messages
+      } else {
+        alert('No new matches found.');
+      }
+    } else {
+      alert('Error checking for matches.');
+    }
+  })
+  .catch(error => {
+    console.error('Error:', error);
+    alert('An error occurred while checking for matches.');
+  })
+  .finally(() => {
+    btn.innerHTML = originalText;
+    btn.disabled = false;
+  });
+}
+
+// Add CSRF token for AJAX requests
+document.addEventListener('DOMContentLoaded', function() {
+  if (!document.querySelector('[name=csrfmiddlewaretoken]')) {
+    const csrfToken = document.createElement('input');
+    csrfToken.type = 'hidden';
+    csrfToken.name = 'csrfmiddlewaretoken';
+    csrfToken.value = '{{ csrf_token }}';
+    document.body.appendChild(csrfToken);
+  }
+});
+</script>
+{% endblock %}
