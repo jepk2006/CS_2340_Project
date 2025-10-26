@@ -6,3 +6,4 @@ bridge/CS2340/bin/*
 **/.venv/
 **/__pycache__/**
 run.sh
+MERGE_ASSESSMENT.md
