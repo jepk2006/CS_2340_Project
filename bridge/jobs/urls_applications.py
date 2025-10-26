@@ -18,6 +18,7 @@ urlpatterns = [
     path("<int:pk>/toggle-flag/", views_applications.toggle_flag, name="toggle_flag"),
     path("<int:pk>/update-priority/", views_applications.update_priority, name="update_priority"),
     path("bulk-update/", views_applications.bulk_update_status, name="bulk_update_status"),
+    path("email/", views_applications.send_candidate_email, name="send_candidate_email"),
 ]
 
 

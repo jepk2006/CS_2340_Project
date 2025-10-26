@@ -5,6 +5,7 @@ from django.views.decorators.http import require_POST
 from django.views.decorators.csrf import csrf_exempt
 from django.contrib import messages
 from django.db.models import Q, Count, Prefetch
+from django.core.mail import send_mail
 import json
 
 from .models import Application, Job
@@ -309,4 +310,51 @@ def bulk_update_status(request):
     messages.success(request, f"Updated {updated_count} application(s) to {dict(Application.Status.choices)[new_status]}.")
     return redirect('applications:recruiter_applications')
 
+
+@login_required
+@require_POST
+def send_candidate_email(request):
+    """Send an email from a recruiter to a candidate for a specific application"""
+    application_id = request.POST.get("application_id")
+    subject = (request.POST.get("subject") or "").strip()
+    message_body = (request.POST.get("message") or "").strip()
+
+    if not application_id:
+        messages.error(request, "Missing application.")
+        return redirect("applications:recruiter_applications")
+
+    application = get_object_or_404(Application, pk=application_id)
+
+    # Only allow the job poster (recruiter) to email this candidate
+    if application.job.posted_by != request.user:
+        messages.error(request, "Permission denied. You can only email applicants to your jobs.")
+        return redirect("applications:recruiter_applications")
+
+    # Basic validation
+    if not subject:
+        messages.error(request, "Subject is required.")
+        return redirect("applications:recruiter_applications")
+
+    if not message_body:
+        messages.error(request, "Message cannot be empty.")
+        return redirect("applications:recruiter_applications")
+
+    recipient_email = (application.applicant.email or "").strip()
+    if not recipient_email:
+        messages.error(request, "This candidate does not have an email on file.")
+        return redirect("applications:recruiter_applications")
+
+    try:
+        send_mail(
+            subject,
+            message_body,
+            None,  # Use DEFAULT_FROM_EMAIL
+            [recipient_email],
+            fail_silently=False,
+        )
+        messages.success(request, f"Email sent to {application.applicant.username}.")
+    except Exception as e:
+        messages.error(request, f"Failed to send email: {str(e)}")
+
+    return redirect("applications:recruiter_applications")
 
