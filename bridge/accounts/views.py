@@ -131,6 +131,10 @@ def recruiter_talent_search(request):
 
     all_skills = Skill.objects.order_by("name")
     user_saved_searches = SavedSearch.objects.filter(recruiter=request.user, is_active=True)
+    
+    # Add match counts to saved searches
+    for search in user_saved_searches:
+        search.match_count = search.get_matching_profiles().count()
 
     context = {
         "page_obj": page_obj,
@@ -338,7 +342,13 @@ def get_unread_messages_count(request):
 @login_required
 def conversations_list(request):
     """List all conversations for the current user"""
-    if request.user.jobseeker_profile.account_type == JobSeekerProfile.AccountType.RECRUITER:
+    # Check if user has a profile and is a recruiter
+    is_recruiter = (
+        hasattr(request.user, 'jobseeker_profile') and 
+        request.user.jobseeker_profile.account_type == JobSeekerProfile.AccountType.RECRUITER
+    )
+    
+    if is_recruiter:
         # Recruiters see conversations they started
         conversations = Conversation.objects.filter(recruiter=request.user).select_related('candidate', 'candidate__jobseeker_profile').prefetch_related('messages')
     else:
@@ -352,7 +362,7 @@ def conversations_list(request):
     
     context = {
         'conversations': conversations,
-        'is_recruiter': request.user.jobseeker_profile.account_type == JobSeekerProfile.AccountType.RECRUITER,
+        'is_recruiter': is_recruiter,
     }
     return render(request, 'accounts/conversations_list.html', context)
 
@@ -389,12 +399,18 @@ def conversation_detail(request, conversation_id):
     # Determine the other participant
     other_user = conversation.candidate if request.user == conversation.recruiter else conversation.recruiter
     
+    # Check if user has a profile and is a recruiter
+    is_recruiter = (
+        hasattr(request.user, 'jobseeker_profile') and 
+        request.user.jobseeker_profile.account_type == JobSeekerProfile.AccountType.RECRUITER
+    )
+    
     context = {
         'conversation': conversation,
         'message_list': message_list,
         'form': form,
         'other_user': other_user,
-        'is_recruiter': request.user.jobseeker_profile.account_type == JobSeekerProfile.AccountType.RECRUITER,
+        'is_recruiter': is_recruiter,
     }
     return render(request, 'accounts/conversation_detail.html', context)
 

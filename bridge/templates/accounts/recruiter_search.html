@@ -36,7 +36,7 @@
               <a href="?saved_search={{ search.id }}" class="text-sm text-gray-700 dark:text-gray-300 hover:text-indigo-600 dark:hover:text-indigo-400 truncate flex-1">
                 {{ search.name }}
               </a>
-              <span class="text-xs text-gray-500 ml-2">{{ search.get_matching_profiles.count }}</span>
+              <span class="text-xs text-gray-500 ml-2">{{ search.match_count }}</span>
             </div>
           {% endfor %}
           {% if saved_searches.count > 5 %}

@@ -183,11 +183,8 @@ class Conversation(models.Model):
         return self.messages.first()
     
     def get_unread_count_for_user(self, user):
-        """Get count of unread messages for a specific user"""
-        return self.messages.filter(
-            sender=user if user == self.recruiter else self.recruiter,
-            is_read=False
-        ).count()
+        """Get count of unread messages for a specific user (messages sent TO the user that are unread)"""
+        return self.messages.filter(is_read=False).exclude(sender=user).count()
 
 
 class Message(models.Model):

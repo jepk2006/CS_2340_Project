@@ -9,7 +9,7 @@
         Messages from Recruiters
       {% endif %}
     </h1>
-    <a href="{% url 'accounts:recruiter_talent_search' %}" class="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-500">
+    <a href="{% if is_recruiter %}{% url 'accounts:recruiter_talent_search' %}{% else %}{% url 'jobs:job_list' %}{% endif %}" class="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-500">
       {% if is_recruiter %}
         Find Candidates
       {% else %}
@@ -82,7 +82,7 @@
           Recruiters will be able to message you when they find your profile interesting.
         {% endif %}
       </p>
-      <a href="{% url 'accounts:recruiter_talent_search' %}" class="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-500">
+      <a href="{% if is_recruiter %}{% url 'accounts:recruiter_talent_search' %}{% else %}{% url 'jobs:job_list' %}{% endif %}" class="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-500">
         {% if is_recruiter %}
           Find Candidates
         {% else %}
