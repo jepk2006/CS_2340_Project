@@ -168,9 +168,9 @@ def update_application_status(request):
         # Get application and check permissions
         app = get_object_or_404(Application, pk=app_id)
         
-        # Check if user can modify this application
-        if app.applicant != request.user and app.job.posted_by != request.user:
-            return JsonResponse({'error': 'Permission denied'}, status=403)
+        # Only allow recruiters (job posters) to modify application status
+        if app.job.posted_by != request.user:
+            return JsonResponse({'error': 'Permission denied. Only recruiters can change application status.'}, status=403)
         
         # Update status
         app.status = new_status

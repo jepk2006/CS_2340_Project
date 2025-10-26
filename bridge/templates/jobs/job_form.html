@@ -1,107 +1,176 @@
 {% extends "base.html" %}
 
 {% block content %}
-<div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
-  <section class="lg:col-span-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-800 rounded-xl p-6">
-    <h1 class="text-2xl font-semibold mb-4">Create New Job Posting</h1>
-    <form method="post" class="space-y-4">
-      {% csrf_token %}
-      {{ form.non_field_errors }}
+<div class="max-w-4xl mx-auto">
+  <div class="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-800 rounded-xl p-6">
+    <div class="mb-6">
+      <h1 class="text-2xl font-semibold">{{ form_title }}</h1>
+      <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">Fill in the details to {{ submit_text|lower }}</p>
+    </div>
 
-      <!-- Job Details -->
+    <form method="post" class="space-y-6">
+      {% csrf_token %}
+      
+      {% if form.non_field_errors %}
+        <div class="rounded-md border border-red-300 dark:border-red-700 bg-red-50 dark:bg-red-900/20 px-4 py-3 text-sm text-red-800 dark:text-red-200">
+          {{ form.non_field_errors }}
+        </div>
+      {% endif %}
+
+      <!-- Basic Information -->
       <div class="space-y-4">
-        <h3 class="text-lg font-medium text-gray-900 dark:text-gray-100">Job Details</h3>
+        <h2 class="text-lg font-medium border-b border-gray-200 dark:border-gray-700 pb-2">Basic Information</h2>
+        
         <div>
-          <label for="{{ form.title.id_for_label }}" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Title</label>
+          <label for="{{ form.title.id_for_label }}" class="block mb-1 font-medium">Job Title *</label>
           {{ form.title }}
-          {{ form.title.errors }}
-        </div>
-        <div>
-          <label for="{{ form.company.id_for_label }}" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Company</label>
-          {{ form.company }}
-          {{ form.company.errors }}
-        </div>
-        <div>
-          <label for="{{ form.description.id_for_label }}" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Description</label>
-          {{ form.description }}
-          {{ form.description.errors }}
-        </div>
-        <div>
-          <label for="{{ form.skills.id_for_label }}" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Skills</label>
-          <div class="mt-1 grid grid-cols-2 gap-2">
-            {% for checkbox in form.skills %}
-              <label class="inline-flex items-center text-sm text-gray-700 dark:text-gray-300">
-                {{ checkbox.tag }} {{ checkbox.choice_label }}
-              </label>
-            {% endfor %}
-          </div>
-          {{ form.skills.errors }}
-          {% if form.skills.help_text %}
-            <p class="mt-1 text-sm text-gray-500">{{ form.skills.help_text }}</p>
+          {% if form.title.errors %}
+            <p class="text-xs text-red-600 dark:text-red-400 mt-1">{{ form.title.errors.0 }}</p>
           {% endif %}
         </div>
+
+        <div>
+          <label for="{{ form.company.id_for_label }}" class="block mb-1 font-medium">Company *</label>
+          {{ form.company }}
+          {% if form.company.errors %}
+            <p class="text-xs text-red-600 dark:text-red-400 mt-1">{{ form.company.errors.0 }}</p>
+          {% endif %}
+        </div>
+
+        <div>
+          <label for="{{ form.description.id_for_label }}" class="block mb-1 font-medium">Job Description *</label>
+          {{ form.description }}
+          {% if form.description.errors %}
+            <p class="text-xs text-red-600 dark:text-red-400 mt-1">{{ form.description.errors.0 }}</p>
+          {% endif %}
+          <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Describe the role, responsibilities, and requirements</p>
+        </div>
+      </div>
+
+      <!-- Skills -->
+      <div class="space-y-4">
+        <h2 class="text-lg font-medium border-b border-gray-200 dark:border-gray-700 pb-2">Required Skills</h2>
+        
+        <div class="grid grid-cols-2 md:grid-cols-3 gap-3">
+          {% for checkbox in form.skills %}
+            <label class="inline-flex items-center gap-2 cursor-pointer">
+              {{ checkbox.tag }}
+              <span class="text-sm">{{ checkbox.choice_label }}</span>
+            </label>
+          {% endfor %}
+        </div>
+        {% if form.skills.errors %}
+          <p class="text-xs text-red-600 dark:text-red-400">{{ form.skills.errors.0 }}</p>
+        {% endif %}
       </div>
 
       <!-- Location -->
       <div class="space-y-4">
-        <h3 class="text-lg font-medium text-gray-900 dark:text-gray-100">Location</h3>
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <h2 class="text-lg font-medium border-b border-gray-200 dark:border-gray-700 pb-2">Location</h2>
+        
+        <div class="grid grid-cols-3 gap-4">
           <div>
-            <label for="{{ form.location_city.id_for_label }}" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">City</label>
+            <label for="{{ form.location_city.id_for_label }}" class="block mb-1 font-medium">City</label>
             {{ form.location_city }}
-            {{ form.location_city.errors }}
+            {% if form.location_city.errors %}
+              <p class="text-xs text-red-600 dark:text-red-400 mt-1">{{ form.location_city.errors.0 }}</p>
+            {% endif %}
           </div>
+
           <div>
-            <label for="{{ form.location_state.id_for_label }}" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">State</label>
+            <label for="{{ form.location_state.id_for_label }}" class="block mb-1 font-medium">State</label>
             {{ form.location_state }}
-            {{ form.location_state.errors }}
+            {% if form.location_state.errors %}
+              <p class="text-xs text-red-600 dark:text-red-400 mt-1">{{ form.location_state.errors.0 }}</p>
+            {% endif %}
           </div>
+
           <div>
-            <label for="{{ form.location_country.id_for_label }}" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Country</label>
+            <label for="{{ form.location_country.id_for_label }}" class="block mb-1 font-medium">Country</label>
             {{ form.location_country }}
-            {{ form.location_country.errors }}
+            {% if form.location_country.errors %}
+              <p class="text-xs text-red-600 dark:text-red-400 mt-1">{{ form.location_country.errors.0 }}</p>
+            {% endif %}
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label for="{{ form.latitude.id_for_label }}" class="block mb-1 font-medium">Latitude</label>
+            {{ form.latitude }}
+            {% if form.latitude.errors %}
+              <p class="text-xs text-red-600 dark:text-red-400 mt-1">{{ form.latitude.errors.0 }}</p>
+            {% endif %}
+            {% if form.latitude.help_text %}
+              <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">{{ form.latitude.help_text }}</p>
+            {% endif %}
+          </div>
+
+          <div>
+            <label for="{{ form.longitude.id_for_label }}" class="block mb-1 font-medium">Longitude</label>
+            {{ form.longitude }}
+            {% if form.longitude.errors %}
+              <p class="text-xs text-red-600 dark:text-red-400 mt-1">{{ form.longitude.errors.0 }}</p>
+            {% endif %}
+            {% if form.longitude.help_text %}
+              <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">{{ form.longitude.help_text }}</p>
+            {% endif %}
           </div>
         </div>
       </div>
 
-      <!-- Salary & Work Type -->
+      <!-- Compensation & Work Details -->
       <div class="space-y-4">
-        <h3 class="text-lg font-medium text-gray-900 dark:text-gray-100">Salary & Work Type</h3>
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <h2 class="text-lg font-medium border-b border-gray-200 dark:border-gray-700 pb-2">Compensation & Work Details</h2>
+        
+        <div class="grid grid-cols-2 gap-4">
           <div>
-            <label for="{{ form.min_salary.id_for_label }}" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Minimum Salary</label>
+            <label for="{{ form.min_salary.id_for_label }}" class="block mb-1 font-medium">Min Salary ($)</label>
             {{ form.min_salary }}
-            {{ form.min_salary.errors }}
+            {% if form.min_salary.errors %}
+              <p class="text-xs text-red-600 dark:text-red-400 mt-1">{{ form.min_salary.errors.0 }}</p>
+            {% endif %}
           </div>
+
           <div>
-            <label for="{{ form.max_salary.id_for_label }}" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Maximum Salary</label>
+            <label for="{{ form.max_salary.id_for_label }}" class="block mb-1 font-medium">Max Salary ($)</label>
             {{ form.max_salary }}
-            {{ form.max_salary.errors }}
+            {% if form.max_salary.errors %}
+              <p class="text-xs text-red-600 dark:text-red-400 mt-1">{{ form.max_salary.errors.0 }}</p>
+            {% endif %}
           </div>
         </div>
+
         <div>
-          <label for="{{ form.work_type.id_for_label }}" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Work Type</label>
+          <label for="{{ form.work_type.id_for_label }}" class="block mb-1 font-medium">Work Type *</label>
           {{ form.work_type }}
-          {{ form.work_type.errors }}
+          {% if form.work_type.errors %}
+            <p class="text-xs text-red-600 dark:text-red-400 mt-1">{{ form.work_type.errors.0 }}</p>
+          {% endif %}
         </div>
-        <div class="flex items-center">
-          {{ form.visa_sponsorship }}
-          <label for="{{ form.visa_sponsorship.id_for_label }}" class="ml-2 text-sm text-gray-700 dark:text-gray-300">Visa Sponsorship Available</label>
+
+        <div>
+          <label class="inline-flex items-center gap-2 cursor-pointer">
+            {{ form.visa_sponsorship }}
+            <span class="font-medium">Offers Visa Sponsorship</span>
+          </label>
+          {% if form.visa_sponsorship.errors %}
+            <p class="text-xs text-red-600 dark:text-red-400 mt-1">{{ form.visa_sponsorship.errors.0 }}</p>
+          {% endif %}
         </div>
-        {{ form.visa_sponsorship.errors }}
       </div>
 
-      <button type="submit" class="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-500">Post Job</button>
+      <!-- Submit Buttons -->
+      <div class="flex items-center gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
+        <button type="submit" class="bg-indigo-600 text-white px-6 py-2 rounded-md hover:bg-indigo-500 font-medium">
+          {{ submit_text }}
+        </button>
+        <a href="{% if is_edit %}{% url 'jobs:job_detail' object.pk %}{% else %}{% url 'jobs:my_jobs' %}{% endif %}" 
+           class="px-6 py-2 rounded-md border border-gray-300 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-700">
+          Cancel
+        </a>
+      </div>
     </form>
-  </section>
-  <aside class="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-800 rounded-xl p-6 h-fit">
-    <h2 class="font-medium mb-2">Tips for a great job post</h2>
-    <ul class="list-disc list-inside text-sm text-gray-600 dark:text-gray-300 space-y-1">
-      <li>Use a clear and concise title.</li>
-      <li>Provide a detailed description of the role and responsibilities.</li>
-      <li>List all relevant skills required.</li>
-      <li>Specify salary range and work type to attract suitable candidates.</li>
-    </ul>
-  </aside>
+  </div>
 </div>
 {% endblock %}

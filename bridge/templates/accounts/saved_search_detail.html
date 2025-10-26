@@ -1,0 +1,157 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="max-w-6xl mx-auto">
+  <!-- Header -->
+  <div class="flex items-center justify-between mb-6">
+    <div>
+      <div class="flex items-center gap-3">
+        <a href="{% url 'accounts:saved_searches' %}" class="text-gray-500 hover:text-gray-700 dark:hover:text-gray-300">
+          ← Back to Saved Searches
+        </a>
+      </div>
+      <h1 class="text-2xl font-semibold mt-2">{{ saved_search.name }}</h1>
+      <div class="flex items-center gap-2 mt-2">
+        <span class="text-xs px-2 py-1 rounded-full {% if saved_search.is_active %}bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300{% else %}bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400{% endif %}">
+          {% if saved_search.is_active %}Active{% else %}Paused{% endif %}
+        </span>
+        <span class="text-sm text-gray-500">{{ total_matches }} match{{ total_matches|pluralize }}</span>
+      </div>
+    </div>
+    <div class="flex items-center gap-2">
+      <a href="{% url 'accounts:recruiter_talent_search' %}?saved_search={{ saved_search.id }}" 
+         class="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-500 font-medium">
+        🔍 Run Search
+      </a>
+      <a href="{% url 'accounts:edit_saved_search' saved_search.id %}" 
+         class="px-4 py-2 rounded-md border border-gray-300 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-700">
+        Edit
+      </a>
+    </div>
+  </div>
+
+  <!-- Search Criteria -->
+  <div class="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-800 rounded-xl p-6 mb-6">
+    <h2 class="text-lg font-semibold mb-4">Search Criteria</h2>
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      {% if saved_search.query %}
+        <div>
+          <div class="text-sm font-medium text-gray-700 dark:text-gray-300">Keywords</div>
+          <div class="text-sm text-gray-600 dark:text-gray-400 mt-1">{{ saved_search.query }}</div>
+        </div>
+      {% endif %}
+      
+      {% if saved_search.skills.exists %}
+        <div>
+          <div class="text-sm font-medium text-gray-700 dark:text-gray-300">Skills</div>
+          <div class="flex flex-wrap gap-1 mt-1">
+            {% for skill in saved_search.skills.all %}
+              <span class="text-xs bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 px-2 py-1 rounded">
+                {{ skill.name }}
+              </span>
+            {% endfor %}
+          </div>
+        </div>
+      {% endif %}
+      
+      {% if saved_search.location_city or saved_search.location_state or saved_search.location_country %}
+        <div>
+          <div class="text-sm font-medium text-gray-700 dark:text-gray-300">Location</div>
+          <div class="text-sm text-gray-600 dark:text-gray-400 mt-1">
+            {% if saved_search.location_city %}{{ saved_search.location_city }}{% endif %}
+            {% if saved_search.location_state %}{% if saved_search.location_city %}, {% endif %}{{ saved_search.location_state }}{% endif %}
+            {% if saved_search.location_country %}{% if saved_search.location_city or saved_search.location_state %}, {% endif %}{{ saved_search.location_country }}{% endif %}
+          </div>
+        </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Matching Profiles -->
+  <div class="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-800 rounded-xl p-6">
+    <div class="flex items-center justify-between mb-4">
+      <h2 class="text-lg font-semibold">Matching Candidates</h2>
+      <span class="text-sm text-gray-500">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
+    </div>
+
+    {% if page_obj.object_list %}
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {% for profile in page_obj.object_list %}
+          <div class="border border-gray-200 dark:border-gray-700 rounded-lg p-4">
+            <div class="flex items-center justify-between mb-2">
+              <div class="font-medium">{{ profile.user.username }}</div>
+              <div class="text-xs text-gray-500">
+                {{ profile.location_city }}{% if profile.location_state %}, {{ profile.location_state }}{% endif %}
+              </div>
+            </div>
+            
+            {% if profile.headline %}
+              <div class="text-sm text-gray-600 dark:text-gray-300 mb-2">{{ profile.headline }}</div>
+            {% endif %}
+            
+            {% if profile.bio %}
+              <p class="text-sm text-gray-600 dark:text-gray-300 mb-3 line-clamp-3">{{ profile.bio }}</p>
+            {% endif %}
+            
+            {% if profile.skills.all %}
+              <div class="flex flex-wrap gap-1">
+                {% for skill in profile.skills.all|slice:":6" %}
+                  <span class="text-xs px-2 py-0.5 rounded-full bg-gray-100 dark:bg-gray-700">{{ skill.name }}</span>
+                {% endfor %}
+                {% if profile.skills.count > 6 %}
+                  <span class="text-xs text-gray-500">+{{ profile.skills.count|add:"-6" }} more</span>
+                {% endif %}
+              </div>
+            {% endif %}
+            
+            <div class="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
+              <div class="text-xs text-gray-500">
+                Updated {{ profile.updated_at|date:"M d, Y" }}
+              </div>
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+
+      <!-- Pagination -->
+      {% if page_obj.has_other_pages %}
+        <div class="flex items-center justify-between mt-6 pt-4 border-t border-gray-200 dark:border-gray-700">
+          <div>
+            {% if page_obj.has_previous %}
+              <a class="px-4 py-2 rounded border border-gray-300 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-700" 
+                 href="?page={{ page_obj.previous_page_number }}">
+                Previous
+              </a>
+            {% endif %}
+          </div>
+          <div class="text-sm text-gray-600 dark:text-gray-400">
+            Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}
+          </div>
+          <div>
+            {% if page_obj.has_next %}
+              <a class="px-4 py-2 rounded border border-gray-300 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-700" 
+                 href="?page={{ page_obj.next_page_number }}">
+                Next
+              </a>
+            {% endif %}
+          </div>
+        </div>
+      {% endif %}
+    {% else %}
+      <div class="text-center py-12">
+        <div class="text-gray-400 dark:text-gray-500 mb-4">
+          <svg class="w-12 h-12 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+          </svg>
+        </div>
+        <h3 class="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">No matching candidates found</h3>
+        <p class="text-gray-500 dark:text-gray-400 mb-4">Try adjusting your search criteria to find more candidates.</p>
+        <a href="{% url 'accounts:edit_saved_search' saved_search.id %}" 
+           class="inline-flex items-center justify-center bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-500 font-medium">
+          Edit Search Criteria
+        </a>
+      </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

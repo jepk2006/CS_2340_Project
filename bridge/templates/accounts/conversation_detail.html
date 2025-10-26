@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="max-w-4xl mx-auto bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-6">
+  <div class="flex justify-between items-center mb-6">
+    <div class="flex items-center space-x-4">
+      <a href="{% url 'accounts:conversations_list' %}" class="text-indigo-600 hover:text-indigo-500">
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
+        </svg>
+      </a>
+      <div>
+        <h1 class="text-2xl font-semibold">Conversation with {{ other_user.username }}</h1>
+        <p class="text-gray-600 dark:text-gray-400 text-sm">
+          {% if is_recruiter %}
+            Candidate
+          {% else %}
+            Recruiter
+          {% endif %}
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Messages Container -->
+  <div class="bg-gray-50 dark:bg-gray-700 rounded-lg p-4 mb-6" style="height: 500px; overflow-y: auto;">
+    {% if message_list %}
+      <div class="space-y-4">
+        {% for message in message_list %}
+          <div class="flex {% if message.sender == request.user %}justify-end{% else %}justify-start{% endif %}">
+            <div class="max-w-xs lg:max-w-md px-4 py-2 rounded-lg {% if message.sender == request.user %}bg-indigo-600 text-white{% else %}bg-white dark:bg-gray-600 text-gray-900 dark:text-gray-100{% endif %}">
+              <p class="text-sm">{{ message.content }}</p>
+              <p class="text-xs mt-1 {% if message.sender == request.user %}text-indigo-100{% else %}text-gray-500 dark:text-gray-400{% endif %}">
+                {{ message.created_at|date:"M j, Y g:i A" }}
+                {% if message.sender == request.user %}
+                  {% if message.is_read %}
+                    <span class="ml-1">✓✓</span>
+                  {% else %}
+                    <span class="ml-1">✓</span>
+                  {% endif %}
+                {% endif %}
+              </p>
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+    {% else %}
+      <div class="text-center py-8">
+        <p class="text-gray-500 dark:text-gray-400">No messages yet. Start the conversation!</p>
+      </div>
+    {% endif %}
+  </div>
+
+  <!-- Message Form -->
+  <form method="post" class="space-y-4">
+    {% csrf_token %}
+    <div>
+      <label for="{{ form.content.id_for_label }}" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+        {{ form.content.label }}
+      </label>
+      {{ form.content }}
+      {% if form.content.errors %}
+        <div class="text-sm text-red-600 mt-1">{{ form.content.errors|striptags }}</div>
+      {% endif %}
+    </div>
+    
+    <div class="flex justify-end">
+      <button type="submit" class="bg-indigo-600 text-white px-6 py-2 rounded-md hover:bg-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+        Send Message
+      </button>
+    </div>
+  </form>
+</div>
+
+<script>
+// Auto-scroll to bottom of messages
+document.addEventListener('DOMContentLoaded', function() {
+    const messagesContainer = document.querySelector('[style*="overflow-y: auto"]');
+    if (messagesContainer) {
+        messagesContainer.scrollTop = messagesContainer.scrollHeight;
+    }
+});
+</script>
+{% endblock %}
