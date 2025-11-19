@@ -24,3 +24,22 @@ def recruiter_required(function=None, redirect_field_name=None, login_url='login
     if function:
         return decorator(function)
     return decorator
+
+
+def admin_required(function=None, redirect_field_name=None, login_url='login'):
+    """Decorator to restrict access to superusers only (administrators)"""
+    def decorator(view_func):
+        @wraps(view_func)
+        def wrapper(request, *args, **kwargs):
+            if not request.user.is_authenticated:
+                return redirect(login_url)
+            
+            if not request.user.is_superuser:
+                return redirect('jobs:job_list')
+            
+            return view_func(request, *args, **kwargs)
+        return wrapper
+    
+    if function:
+        return decorator(function)
+    return decorator

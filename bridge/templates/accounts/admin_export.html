@@ -1,0 +1,201 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="max-w-6xl mx-auto">
+  <div class="mb-8">
+    <h1 class="text-3xl font-bold mb-2">Admin Data Export Dashboard</h1>
+    <p class="text-gray-600 dark:text-gray-400">Export system data for reporting and analysis purposes</p>
+  </div>
+
+  <!-- Stats Overview -->
+  <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+    <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
+      <div class="text-sm text-gray-600 dark:text-gray-400 mb-1">Total Users</div>
+      <div class="text-2xl font-bold">{{ stats.users }}</div>
+    </div>
+    <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
+      <div class="text-sm text-gray-600 dark:text-gray-400 mb-1">Total Jobs</div>
+      <div class="text-2xl font-bold">{{ stats.jobs }}</div>
+    </div>
+    <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
+      <div class="text-sm text-gray-600 dark:text-gray-400 mb-1">Total Applications</div>
+      <div class="text-2xl font-bold">{{ stats.applications }}</div>
+    </div>
+    <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
+      <div class="text-sm text-gray-600 dark:text-gray-400 mb-1">Total Conversations</div>
+      <div class="text-2xl font-bold">{{ stats.conversations }}</div>
+    </div>
+  </div>
+
+  <!-- Export Options -->
+  <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
+    <h2 class="text-xl font-semibold mb-4">Export Data</h2>
+    <p class="text-sm text-gray-600 dark:text-gray-400 mb-6">
+      Click on any of the export options below to download a CSV file containing the respective data.
+    </p>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <!-- Users Export -->
+      <div class="border border-gray-200 dark:border-gray-700 rounded-lg p-4 hover:border-indigo-500 dark:hover:border-indigo-500 transition-colors">
+        <div class="flex items-start justify-between mb-3">
+          <div>
+            <h3 class="font-semibold text-lg mb-1">Users</h3>
+            <p class="text-sm text-gray-600 dark:text-gray-400">Export all user accounts</p>
+          </div>
+          <div class="bg-indigo-100 dark:bg-indigo-900 text-indigo-600 dark:text-indigo-300 px-2 py-1 rounded text-xs font-medium">
+            {{ stats.users }} records
+          </div>
+        </div>
+        <div class="text-xs text-gray-500 dark:text-gray-400 mb-3">
+          Includes: ID, username, email, first/last name, staff status, active status, dates
+        </div>
+        <a href="{% url 'accounts:admin_export_users' %}" 
+           class="inline-block w-full text-center bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-md text-sm transition-colors">
+          Download CSV
+        </a>
+      </div>
+
+      <!-- Profiles Export -->
+      <div class="border border-gray-200 dark:border-gray-700 rounded-lg p-4 hover:border-indigo-500 dark:hover:border-indigo-500 transition-colors">
+        <div class="flex items-start justify-between mb-3">
+          <div>
+            <h3 class="font-semibold text-lg mb-1">User Profiles</h3>
+            <p class="text-sm text-gray-600 dark:text-gray-400">Export all job seeker profiles</p>
+          </div>
+          <div class="bg-indigo-100 dark:bg-indigo-900 text-indigo-600 dark:text-indigo-300 px-2 py-1 rounded text-xs font-medium">
+            {{ stats.profiles }} records
+          </div>
+        </div>
+        <div class="text-xs text-gray-500 dark:text-gray-400 mb-3">
+          Includes: Account type, headline, bio, education, experience, location, skills, visibility
+        </div>
+        <a href="{% url 'accounts:admin_export_profiles' %}" 
+           class="inline-block w-full text-center bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-md text-sm transition-colors">
+          Download CSV
+        </a>
+      </div>
+
+      <!-- Jobs Export -->
+      <div class="border border-gray-200 dark:border-gray-700 rounded-lg p-4 hover:border-indigo-500 dark:hover:border-indigo-500 transition-colors">
+        <div class="flex items-start justify-between mb-3">
+          <div>
+            <h3 class="font-semibold text-lg mb-1">Jobs</h3>
+            <p class="text-sm text-gray-600 dark:text-gray-400">Export all job postings</p>
+          </div>
+          <div class="bg-indigo-100 dark:bg-indigo-900 text-indigo-600 dark:text-indigo-300 px-2 py-1 rounded text-xs font-medium">
+            {{ stats.jobs }} records
+          </div>
+        </div>
+        <div class="text-xs text-gray-500 dark:text-gray-400 mb-3">
+          Includes: Title, company, description, location, salary, work type, skills, posted by
+        </div>
+        <a href="{% url 'accounts:admin_export_jobs' %}" 
+           class="inline-block w-full text-center bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-md text-sm transition-colors">
+          Download CSV
+        </a>
+      </div>
+
+      <!-- Applications Export -->
+      <div class="border border-gray-200 dark:border-gray-700 rounded-lg p-4 hover:border-indigo-500 dark:hover:border-indigo-500 transition-colors">
+        <div class="flex items-start justify-between mb-3">
+          <div>
+            <h3 class="font-semibold text-lg mb-1">Applications</h3>
+            <p class="text-sm text-gray-600 dark:text-gray-400">Export all job applications</p>
+          </div>
+          <div class="bg-indigo-100 dark:bg-indigo-900 text-indigo-600 dark:text-indigo-300 px-2 py-1 rounded text-xs font-medium">
+            {{ stats.applications }} records
+          </div>
+        </div>
+        <div class="text-xs text-gray-500 dark:text-gray-400 mb-3">
+          Includes: Job info, applicant info, status, priority, notes, timeline, days in stage
+        </div>
+        <a href="{% url 'accounts:admin_export_applications' %}" 
+           class="inline-block w-full text-center bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-md text-sm transition-colors">
+          Download CSV
+        </a>
+      </div>
+
+      <!-- Skills Export -->
+      <div class="border border-gray-200 dark:border-gray-700 rounded-lg p-4 hover:border-indigo-500 dark:hover:border-indigo-500 transition-colors">
+        <div class="flex items-start justify-between mb-3">
+          <div>
+            <h3 class="font-semibold text-lg mb-1">Skills</h3>
+            <p class="text-sm text-gray-600 dark:text-gray-400">Export all skills and usage stats</p>
+          </div>
+          <div class="bg-indigo-100 dark:bg-indigo-900 text-indigo-600 dark:text-indigo-300 px-2 py-1 rounded text-xs font-medium">
+            {{ stats.skills }} records
+          </div>
+        </div>
+        <div class="text-xs text-gray-500 dark:text-gray-400 mb-3">
+          Includes: Skill name, number of associated jobs, number of profiles with skill
+        </div>
+        <a href="{% url 'accounts:admin_export_skills' %}" 
+           class="inline-block w-full text-center bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-md text-sm transition-colors">
+          Download CSV
+        </a>
+      </div>
+
+      <!-- Conversations Export -->
+      <div class="border border-gray-200 dark:border-gray-700 rounded-lg p-4 hover:border-indigo-500 dark:hover:border-indigo-500 transition-colors">
+        <div class="flex items-start justify-between mb-3">
+          <div>
+            <h3 class="font-semibold text-lg mb-1">Conversations</h3>
+            <p class="text-sm text-gray-600 dark:text-gray-400">Export all conversations</p>
+          </div>
+          <div class="bg-indigo-100 dark:bg-indigo-900 text-indigo-600 dark:text-indigo-300 px-2 py-1 rounded text-xs font-medium">
+            {{ stats.conversations }} records
+          </div>
+        </div>
+        <div class="text-xs text-gray-500 dark:text-gray-400 mb-3">
+          Includes: Recruiter, candidate, message count, created/updated dates
+        </div>
+        <a href="{% url 'accounts:admin_export_conversations' %}" 
+           class="inline-block w-full text-center bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-md text-sm transition-colors">
+          Download CSV
+        </a>
+      </div>
+
+      <!-- Messages Export -->
+      <div class="border border-gray-200 dark:border-gray-700 rounded-lg p-4 hover:border-indigo-500 dark:hover:border-indigo-500 transition-colors">
+        <div class="flex items-start justify-between mb-3">
+          <div>
+            <h3 class="font-semibold text-lg mb-1">Messages</h3>
+            <p class="text-sm text-gray-600 dark:text-gray-400">Export all conversation messages</p>
+          </div>
+          <div class="bg-indigo-100 dark:bg-indigo-900 text-indigo-600 dark:text-indigo-300 px-2 py-1 rounded text-xs font-medium">
+            {{ stats.messages }} records
+          </div>
+        </div>
+        <div class="text-xs text-gray-500 dark:text-gray-400 mb-3">
+          Includes: Conversation ID, sender, content, read status, created date
+        </div>
+        <a href="{% url 'accounts:admin_export_messages' %}" 
+           class="inline-block w-full text-center bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-md text-sm transition-colors">
+          Download CSV
+        </a>
+      </div>
+
+      <!-- Saved Searches Export -->
+      <div class="border border-gray-200 dark:border-gray-700 rounded-lg p-4 hover:border-indigo-500 dark:hover:border-indigo-500 transition-colors">
+        <div class="flex items-start justify-between mb-3">
+          <div>
+            <h3 class="font-semibold text-lg mb-1">Saved Searches</h3>
+            <p class="text-sm text-gray-600 dark:text-gray-400">Export all recruiter saved searches</p>
+          </div>
+          <div class="bg-indigo-100 dark:bg-indigo-900 text-indigo-600 dark:text-indigo-300 px-2 py-1 rounded text-xs font-medium">
+            {{ stats.saved_searches }} records
+          </div>
+        </div>
+        <div class="text-xs text-gray-500 dark:text-gray-400 mb-3">
+          Includes: Recruiter, search name, criteria (query, skills, location), active status
+        </div>
+        <a href="{% url 'accounts:admin_export_saved_searches' %}" 
+           class="inline-block w-full text-center bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-md text-sm transition-colors">
+          Download CSV
+        </a>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+

@@ -6,13 +6,15 @@ from django.core.paginator import Paginator
 from django.db.models import Q
 from django.contrib import messages
 from django.urls import reverse
-from django.http import JsonResponse
+from django.http import JsonResponse, HttpResponse
 from django.views.decorators.http import require_POST
+import csv
+from datetime import datetime
 
 from .models import JobSeekerProfile, SavedSearch, TalentMessage, Conversation, Message
 from .forms import SavedSearchForm, JobSeekerProfileForm, MessageForm
-from jobs.models import Skill
-from jobs.decorators import recruiter_required
+from jobs.models import Skill, Job, Application
+from jobs.decorators import recruiter_required, admin_required
 
 
 
@@ -461,6 +463,283 @@ def send_message(request, conversation_id):
             messages.error(request, "Failed to send message. Please try again.")
     
     return redirect('accounts:conversation_detail', conversation_id=conversation.id)
+
+
+# Admin Data Export Views
+
+@admin_required
+def admin_export_dashboard(request):
+    """Dashboard for administrators to select and export data"""
+    User = get_user_model()
+    
+    # Get counts for display
+    stats = {
+        'users': User.objects.count(),
+        'profiles': JobSeekerProfile.objects.count(),
+        'jobs': Job.objects.count(),
+        'applications': Application.objects.count(),
+        'skills': Skill.objects.count(),
+        'conversations': Conversation.objects.count(),
+        'messages': Message.objects.count(),
+        'saved_searches': SavedSearch.objects.count(),
+    }
+    
+    context = {
+        'stats': stats,
+    }
+    return render(request, 'accounts/admin_export.html', context)
+
+
+@admin_required
+def export_users(request):
+    """Export all users to CSV"""
+    User = get_user_model()
+    
+    response = HttpResponse(content_type='text/csv')
+    response['Content-Disposition'] = f'attachment; filename="users_export_{datetime.now().strftime("%Y%m%d_%H%M%S")}.csv"'
+    
+    writer = csv.writer(response)
+    writer.writerow(['ID', 'Username', 'Email', 'First Name', 'Last Name', 'Is Staff', 'Is Superuser', 'Is Active', 'Date Joined', 'Last Login'])
+    
+    for user in User.objects.all():
+        writer.writerow([
+            user.id,
+            user.username,
+            user.email,
+            user.first_name,
+            user.last_name,
+            user.is_staff,
+            user.is_superuser,
+            user.is_active,
+            user.date_joined,
+            user.last_login,
+        ])
+    
+    return response
+
+
+@admin_required
+def export_profiles(request):
+    """Export all job seeker profiles to CSV"""
+    response = HttpResponse(content_type='text/csv')
+    response['Content-Disposition'] = f'attachment; filename="profiles_export_{datetime.now().strftime("%Y%m%d_%H%M%S")}.csv"'
+    
+    writer = csv.writer(response)
+    writer.writerow([
+        'User ID', 'Username', 'Account Type', 'Headline', 'Bio', 
+        'Education', 'Experience', 'Location City', 'Location State', 
+        'Location Country', 'Latitude', 'Longitude', 'Commute Radius',
+        'Portfolio URL', 'LinkedIn URL', 'GitHub URL', 
+        'Visibility', 'Show Email', 'Skills', 'Updated At'
+    ])
+    
+    for profile in JobSeekerProfile.objects.select_related('user').prefetch_related('skills').all():
+        skills_list = ', '.join([skill.name for skill in profile.skills.all()])
+        writer.writerow([
+            profile.user.id,
+            profile.user.username,
+            profile.account_type,
+            profile.headline,
+            profile.bio,
+            profile.education,
+            profile.experience,
+            profile.location_city,
+            profile.location_state,
+            profile.location_country,
+            profile.latitude,
+            profile.longitude,
+            profile.commute_radius,
+            profile.portfolio_url,
+            profile.linkedin_url,
+            profile.github_url,
+            profile.visibility,
+            profile.show_email,
+            skills_list,
+            profile.updated_at,
+        ])
+    
+    return response
+
+
+@admin_required
+def export_jobs(request):
+    """Export all jobs to CSV"""
+    response = HttpResponse(content_type='text/csv')
+    response['Content-Disposition'] = f'attachment; filename="jobs_export_{datetime.now().strftime("%Y%m%d_%H%M%S")}.csv"'
+    
+    writer = csv.writer(response)
+    writer.writerow([
+        'ID', 'Title', 'Company', 'Description', 'Location City', 
+        'Location State', 'Location Country', 'Latitude', 'Longitude',
+        'Min Salary', 'Max Salary', 'Work Type', 'Visa Sponsorship',
+        'Posted By (Username)', 'Skills', 'Created At'
+    ])
+    
+    for job in Job.objects.select_related('posted_by').prefetch_related('skills').all():
+        skills_list = ', '.join([skill.name for skill in job.skills.all()])
+        posted_by = job.posted_by.username if job.posted_by else 'N/A'
+        writer.writerow([
+            job.id,
+            job.title,
+            job.company,
+            job.description,
+            job.location_city,
+            job.location_state,
+            job.location_country,
+            job.latitude,
+            job.longitude,
+            job.min_salary,
+            job.max_salary,
+            job.work_type,
+            job.visa_sponsorship,
+            posted_by,
+            skills_list,
+            job.created_at,
+        ])
+    
+    return response
+
+
+@admin_required
+def export_applications(request):
+    """Export all applications to CSV"""
+    response = HttpResponse(content_type='text/csv')
+    response['Content-Disposition'] = f'attachment; filename="applications_export_{datetime.now().strftime("%Y%m%d_%H%M%S")}.csv"'
+    
+    writer = csv.writer(response)
+    writer.writerow([
+        'ID', 'Job Title', 'Job Company', 'Applicant Username', 
+        'Applicant Email', 'Status', 'Priority', 'Flagged', 
+        'Applicant Note', 'Recruiter Notes', 'Position in Stage',
+        'Days in Current Stage', 'Stage Changed At', 'Created At', 'Updated At'
+    ])
+    
+    for app in Application.objects.select_related('job', 'applicant').all():
+        writer.writerow([
+            app.id,
+            app.job.title,
+            app.job.company,
+            app.applicant.username,
+            app.applicant.email,
+            app.status,
+            app.priority,
+            app.flagged,
+            app.note,
+            app.recruiter_notes,
+            app.position_in_stage,
+            app.days_in_current_stage(),
+            app.stage_changed_at,
+            app.created_at,
+            app.updated_at,
+        ])
+    
+    return response
+
+
+@admin_required
+def export_skills(request):
+    """Export all skills to CSV"""
+    response = HttpResponse(content_type='text/csv')
+    response['Content-Disposition'] = f'attachment; filename="skills_export_{datetime.now().strftime("%Y%m%d_%H%M%S")}.csv"'
+    
+    writer = csv.writer(response)
+    writer.writerow(['ID', 'Skill Name', 'Number of Jobs', 'Number of Profiles'])
+    
+    for skill in Skill.objects.all():
+        jobs_count = skill.jobs.count()
+        profiles_count = skill.profiles.count()
+        writer.writerow([
+            skill.id,
+            skill.name,
+            jobs_count,
+            profiles_count,
+        ])
+    
+    return response
+
+
+@admin_required
+def export_conversations(request):
+    """Export all conversations to CSV"""
+    response = HttpResponse(content_type='text/csv')
+    response['Content-Disposition'] = f'attachment; filename="conversations_export_{datetime.now().strftime("%Y%m%d_%H%M%S")}.csv"'
+    
+    writer = csv.writer(response)
+    writer.writerow([
+        'ID', 'Recruiter Username', 'Candidate Username', 
+        'Message Count', 'Created At', 'Updated At'
+    ])
+    
+    for conversation in Conversation.objects.select_related('recruiter', 'candidate').all():
+        message_count = conversation.messages.count()
+        writer.writerow([
+            conversation.id,
+            conversation.recruiter.username,
+            conversation.candidate.username,
+            message_count,
+            conversation.created_at,
+            conversation.updated_at,
+        ])
+    
+    return response
+
+
+@admin_required
+def export_messages(request):
+    """Export all messages to CSV"""
+    response = HttpResponse(content_type='text/csv')
+    response['Content-Disposition'] = f'attachment; filename="messages_export_{datetime.now().strftime("%Y%m%d_%H%M%S")}.csv"'
+    
+    writer = csv.writer(response)
+    writer.writerow([
+        'ID', 'Conversation ID', 'Sender Username', 'Content', 
+        'Is Read', 'Created At'
+    ])
+    
+    for message in Message.objects.select_related('conversation', 'sender').all():
+        writer.writerow([
+            message.id,
+            message.conversation.id,
+            message.sender.username,
+            message.content,
+            message.is_read,
+            message.created_at,
+        ])
+    
+    return response
+
+
+@admin_required
+def export_saved_searches(request):
+    """Export all saved searches to CSV"""
+    response = HttpResponse(content_type='text/csv')
+    response['Content-Disposition'] = f'attachment; filename="saved_searches_export_{datetime.now().strftime("%Y%m%d_%H%M%S")}.csv"'
+    
+    writer = csv.writer(response)
+    writer.writerow([
+        'ID', 'Recruiter Username', 'Search Name', 'Query', 
+        'Skills', 'Location City', 'Location State', 'Location Country',
+        'Is Active', 'Last Check', 'Created At', 'Updated At'
+    ])
+    
+    for search in SavedSearch.objects.select_related('recruiter').prefetch_related('skills').all():
+        skills_list = ', '.join([skill.name for skill in search.skills.all()])
+        writer.writerow([
+            search.id,
+            search.recruiter.username,
+            search.name,
+            search.query,
+            skills_list,
+            search.location_city,
+            search.location_state,
+            search.location_country,
+            search.is_active,
+            search.last_check,
+            search.created_at,
+            search.updated_at,
+        ])
+    
+    return response
 
 
 # Create your views here.

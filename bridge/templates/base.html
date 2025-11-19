@@ -48,6 +48,9 @@
               <a href="/applications/my/" class="hover:text-indigo-600">My Applications</a>
             {% endif %}
             <a href="/accounts/messages/" class="hover:text-indigo-600">Messages</a>
+            {% if request.user.is_superuser %}
+              <a href="/accounts/admin/export/" class="hover:text-indigo-600 font-semibold">Admin Export</a>
+            {% endif %}
           {% endif %}
           <a href="/accounts/profile/edit/" class="hover:text-indigo-600">My Profile</a>
         </nav>

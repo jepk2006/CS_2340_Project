@@ -24,6 +24,17 @@ urlpatterns = [
     path("messages/<int:conversation_id>/", views.conversation_detail, name="conversation_detail"),
     path("messages/start/<int:candidate_id>/", views.start_conversation, name="start_conversation"),
     path("messages/<int:conversation_id>/send/", views.send_message, name="send_message"),
+    
+    # Admin Export URLs
+    path("admin/export/", views.admin_export_dashboard, name="admin_export_dashboard"),
+    path("admin/export/users/", views.export_users, name="admin_export_users"),
+    path("admin/export/profiles/", views.export_profiles, name="admin_export_profiles"),
+    path("admin/export/jobs/", views.export_jobs, name="admin_export_jobs"),
+    path("admin/export/applications/", views.export_applications, name="admin_export_applications"),
+    path("admin/export/skills/", views.export_skills, name="admin_export_skills"),
+    path("admin/export/conversations/", views.export_conversations, name="admin_export_conversations"),
+    path("admin/export/messages/", views.export_messages, name="admin_export_messages"),
+    path("admin/export/saved-searches/", views.export_saved_searches, name="admin_export_saved_searches"),
 ]
 
 
