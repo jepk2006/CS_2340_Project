@@ -7,12 +7,16 @@ from django.views.generic import DetailView, CreateView, UpdateView, ListView
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django_filters.views import FilterView
 from django import forms
+from django.db.models import Q
+from django.utils import timezone
+from django.core.paginator import Paginator
 import django_filters
 import math
 
 from .models import Job, Skill, Application
 from django.views.decorators.http import require_POST
 from accounts.models import JobSeekerProfile
+from .decorators import admin_required
 
 
 def calculate_distance(lat1, lon1, lat2, lon2):
@@ -132,6 +136,8 @@ class JobListView(FilterView):
 
     def get_queryset(self):
         queryset = super().get_queryset()
+        if not (self.request.user.is_authenticated and self.request.user.is_superuser):
+            queryset = queryset.exclude(moderation_status=Job.ModerationStatus.REMOVED)
         return apply_commute_radius_filter(queryset, self.request.user)
 
     def get_context_data(self, **kwargs):
@@ -145,6 +151,12 @@ class JobDetailView(DetailView):
     model = Job
     template_name = "jobs/job_detail.html"
     context_object_name = "job"
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        if not (self.request.user.is_authenticated and self.request.user.is_superuser):
+            queryset = queryset.exclude(moderation_status=Job.ModerationStatus.REMOVED)
+        return queryset
 
 
 @login_required
@@ -160,7 +172,11 @@ def apply_one_click(request, pk):
 
 
 def job_map_data(request):
-    filterset = JobFilter(request.GET, queryset=Job.objects.all())
+    base_qs = Job.objects.all()
+    if not (request.user.is_authenticated and request.user.is_superuser):
+        base_qs = base_qs.exclude(moderation_status=Job.ModerationStatus.REMOVED)
+
+    filterset = JobFilter(request.GET, queryset=base_qs)
     qs = filterset.qs
 
     # Optional map-specific filtering via query params
@@ -382,4 +398,92 @@ class MyJobsListView(RecruiterRequiredMixin, ListView):
         context['total_applications'] = Application.objects.filter(job__in=jobs).count()
         return context
 
-# Create your views here.
+# ===== Job Moderation (Admin) =====
+
+@admin_required
+def moderate_jobs(request):
+    """Admin dashboard to review and moderate job posts."""
+    status_filter = request.GET.get("status", "all")
+    search_query = request.GET.get("q", "").strip()
+
+    jobs = Job.objects.all().select_related("posted_by", "moderated_by").prefetch_related("skills")
+
+    if status_filter != "all":
+        jobs = jobs.filter(moderation_status=status_filter)
+
+    if search_query:
+        jobs = jobs.filter(
+            Q(title__icontains=search_query)
+            | Q(company__icontains=search_query)
+            | Q(description__icontains=search_query)
+        )
+
+    jobs = jobs.order_by("-created_at")
+    paginator = Paginator(jobs, 20)
+    page_obj = paginator.get_page(request.GET.get("page"))
+
+    status_counts = {
+        "all": Job.objects.count(),
+        "active": Job.objects.filter(moderation_status=Job.ModerationStatus.ACTIVE).count(),
+        "pending": Job.objects.filter(moderation_status=Job.ModerationStatus.PENDING).count(),
+        "flagged": Job.objects.filter(moderation_status=Job.ModerationStatus.FLAGGED).count(),
+        "removed": Job.objects.filter(moderation_status=Job.ModerationStatus.REMOVED).count(),
+    }
+
+    context = {
+        "page_obj": page_obj,
+        "status_filter": status_filter,
+        "search_query": search_query,
+        "status_counts": status_counts,
+        "status_choices": Job.ModerationStatus.choices,
+    }
+    return render(request, "jobs/moderate_jobs.html", context)
+
+
+@admin_required
+@require_POST
+def moderate_job_action(request, job_id):
+    """Handle moderation actions like approve/remove/flag."""
+    job = get_object_or_404(Job, id=job_id)
+    action = request.POST.get("action")
+    reason = request.POST.get("reason", "").strip()
+
+    if action == "approve":
+        job.moderation_status = Job.ModerationStatus.ACTIVE
+        job.moderation_reason = ""
+        messages.success(request, f'"{job.title}" is now active.')
+    elif action == "remove":
+        job.moderation_status = Job.ModerationStatus.REMOVED
+        job.moderation_reason = reason or "Removed by administrator"
+        messages.success(request, f'"{job.title}" has been removed.')
+    elif action == "flag":
+        job.moderation_status = Job.ModerationStatus.FLAGGED
+        job.moderation_reason = reason or "Flagged for review"
+        messages.success(request, f'"{job.title}" has been flagged.')
+    elif action == "pending":
+        job.moderation_status = Job.ModerationStatus.PENDING
+        job.moderation_reason = reason or "Pending review"
+        messages.info(request, f'"{job.title}" set to pending review.')
+    else:
+        messages.error(request, "Invalid moderation action.")
+        return redirect("jobs:moderate_jobs")
+
+    job.moderated_by = request.user
+    job.moderated_at = timezone.now()
+    job.save()
+
+    status_filter = request.POST.get("status_filter", "all")
+    redirect_url = f"{reverse('jobs:moderate_jobs')}?status={status_filter}"
+    return redirect(redirect_url)
+
+
+@admin_required
+def job_detail_moderation(request, job_id):
+    """Detailed view of a job for moderation purposes."""
+    job = get_object_or_404(Job, id=job_id)
+    context = {
+        "job": job,
+        "applications_count": job.applications.count(),
+    }
+    return render(request, "jobs/job_detail_moderation.html", context)
+

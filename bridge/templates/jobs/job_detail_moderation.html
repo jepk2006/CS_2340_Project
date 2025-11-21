@@ -1,0 +1,112 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="max-w-4xl mx-auto bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-6">
+  <div class="flex justify-between items-center mb-6">
+    <div>
+      <h1 class="text-2xl font-semibold">{{ job.title }}</h1>
+      <p class="text-gray-600 dark:text-gray-400">{{ job.company }}</p>
+    </div>
+    <a href="{% url 'jobs:moderate_jobs' %}" class="text-indigo-600 hover:text-indigo-500">← Back to Moderation</a>
+  </div>
+
+  <div class="mb-6">
+    <span class="px-3 py-1 text-sm rounded-full
+      {% if job.moderation_status == 'active' %}bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200
+      {% elif job.moderation_status == 'pending' %}bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200
+      {% elif job.moderation_status == 'flagged' %}bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200
+      {% elif job.moderation_status == 'removed' %}bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200
+      {% endif %}">
+      Status: {{ job.get_moderation_status_display }}
+    </span>
+  </div>
+
+  <div class="space-y-6">
+    <section>
+      <h2 class="text-lg font-semibold mb-2">Job Information</h2>
+      <div class="bg-gray-50 dark:bg-gray-700 rounded-lg p-4 space-y-2">
+        <p><strong>Title:</strong> {{ job.title }}</p>
+        <p><strong>Company:</strong> {{ job.company }}</p>
+        <p><strong>Work Type:</strong> {{ job.get_work_type_display }}</p>
+        <p><strong>Location:</strong>
+          {% if job.location_city %}{{ job.location_city }}{% endif %}
+          {% if job.location_state %}, {{ job.location_state }}{% endif %}
+          {% if job.location_country %}, {{ job.location_country }}{% endif %}
+        </p>
+        {% if job.min_salary or job.max_salary %}
+          <p><strong>Salary Range:</strong>
+            {% if job.min_salary %}${{ job.min_salary|floatformat:0 }}{% endif %}
+            {% if job.min_salary and job.max_salary %} - {% endif %}
+            {% if job.max_salary %}${{ job.max_salary|floatformat:0 }}{% endif %}
+          </p>
+        {% endif %}
+        <p><strong>Visa Sponsorship:</strong> {% if job.visa_sponsorship %}Yes{% else %}No{% endif %}</p>
+        <p><strong>Posted by:</strong> {{ job.posted_by.username|default:"Unknown" }}</p>
+        <p><strong>Created:</strong> {{ job.created_at|date:"M d, Y g:i A" }}</p>
+      </div>
+    </section>
+
+    <section>
+      <h2 class="text-lg font-semibold mb-2">Description</h2>
+      <div class="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
+        <p class="whitespace-pre-wrap">{{ job.description }}</p>
+      </div>
+    </section>
+
+    {% if job.skills.all %}
+      <section>
+        <h2 class="text-lg font-semibold mb-2">Skills</h2>
+        <div class="flex flex-wrap gap-2">
+          {% for skill in job.skills.all %}
+            <span class="px-2 py-1 bg-indigo-100 dark:bg-indigo-900 text-indigo-800 dark:text-indigo-200 rounded text-sm">{{ skill.name }}</span>
+          {% endfor %}
+        </div>
+      </section>
+    {% endif %}
+
+    <section>
+      <h2 class="text-lg font-semibold mb-2">Moderation Information</h2>
+      <div class="bg-gray-50 dark:bg-gray-700 rounded-lg p-4 space-y-2">
+        {% if job.moderation_reason %}
+          <p><strong>Reason:</strong> {{ job.moderation_reason }}</p>
+        {% endif %}
+        {% if job.moderated_by %}
+          <p><strong>Moderated by:</strong> {{ job.moderated_by.username }}</p>
+          <p><strong>Moderated at:</strong> {{ job.moderated_at|date:"M d, Y g:i A" }}</p>
+        {% else %}
+          <p class="text-gray-500 dark:text-gray-400">Not yet moderated.</p>
+        {% endif %}
+        <p><strong>Applications:</strong> {{ applications_count }}</p>
+      </div>
+    </section>
+
+    <section>
+      <h2 class="text-lg font-semibold mb-4">Moderation Actions</h2>
+      <div class="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
+        <form method="post" action="{% url 'jobs:moderate_job_action' job.id %}" class="space-y-4">
+          {% csrf_token %}
+          <input type="hidden" name="status_filter" value="all">
+          <div class="flex flex-wrap gap-2">
+            {% if job.moderation_status != 'active' %}
+              <button type="submit" name="action" value="approve" class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-500">✓ Approve</button>
+            {% endif %}
+            {% if job.moderation_status != 'removed' %}
+              <button type="submit" name="action" value="remove" class="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-500" onclick="return confirm('Remove this job?')">✗ Remove</button>
+            {% endif %}
+            {% if job.moderation_status != 'flagged' %}
+              <button type="submit" name="action" value="flag" class="bg-orange-600 text-white px-4 py-2 rounded hover:bg-orange-500">⚠ Flag</button>
+            {% endif %}
+            {% if job.moderation_status != 'pending' %}
+              <button type="submit" name="action" value="pending" class="bg-yellow-600 text-white px-4 py-2 rounded hover:bg-yellow-500">⏳ Set Pending</button>
+            {% endif %}
+          </div>
+          <div>
+            <label for="reason" class="block text-sm font-medium mb-1">Reason (optional)</label>
+            <textarea id="reason" name="reason" rows="3" class="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md" placeholder="Explain why you're moderating this job..."></textarea>
+          </div>
+        </form>
+      </div>
+    </section>
+  </div>
+</div>
+{% endblock %}
+

@@ -15,6 +15,12 @@ class Job(models.Model):
         REMOTE = "remote", "Remote"
         HYBRID = "hybrid", "Hybrid"
 
+    class ModerationStatus(models.TextChoices):
+        ACTIVE = "active", "Active"
+        PENDING = "pending", "Pending Review"
+        FLAGGED = "flagged", "Flagged"
+        REMOVED = "removed", "Removed"
+
     title = models.CharField(max_length=200)
     company = models.CharField(max_length=200)
     description = models.TextField()
@@ -33,6 +39,28 @@ class Job(models.Model):
 
     posted_by = models.ForeignKey(get_user_model(), on_delete=models.SET_NULL, null=True, blank=True, related_name="posted_jobs")
     created_at = models.DateTimeField(auto_now_add=True)
+
+    moderation_status = models.CharField(
+        max_length=20,
+        choices=ModerationStatus.choices,
+        default=ModerationStatus.ACTIVE,
+        help_text="Moderation status to control visibility",
+    )
+    moderation_reason = models.TextField(
+        blank=True,
+        help_text="Optional reason explaining why moderation status was changed",
+    )
+    moderated_at = models.DateTimeField(null=True, blank=True)
+    moderated_by = models.ForeignKey(
+        get_user_model(),
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="moderated_jobs",
+    )
+
+    class Meta:
+        ordering = ["-created_at"]
 
     def __str__(self):
         return f"{self.title} @ {self.company}"

@@ -9,10 +9,28 @@ class SkillAdmin(admin.ModelAdmin):
 
 @admin.register(Job)
 class JobAdmin(admin.ModelAdmin):
-    list_display = ("title", "company", "work_type", "visa_sponsorship", "created_at")
-    list_filter = ("work_type", "visa_sponsorship")
+    list_display = ("title", "company", "work_type", "moderation_status", "visa_sponsorship", "created_at")
+    list_filter = ("work_type", "visa_sponsorship", "moderation_status", "created_at")
     search_fields = ("title", "company", "description")
     filter_horizontal = ("skills",)
+    readonly_fields = ("moderated_at",)
+    fieldsets = (
+        ("Job Details", {
+            "fields": ("title", "company", "description", "skills", "work_type", "visa_sponsorship")
+        }),
+        ("Location", {
+            "fields": ("location_city", "location_state", "location_country", "latitude", "longitude")
+        }),
+        ("Compensation", {
+            "fields": ("min_salary", "max_salary")
+        }),
+        ("Moderation", {
+            "fields": ("moderation_status", "moderation_reason", "moderated_by", "moderated_at")
+        }),
+        ("Metadata", {
+            "fields": ("posted_by", "created_at")
+        }),
+    )
 
 
 @admin.register(Application)

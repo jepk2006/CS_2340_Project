@@ -1,0 +1,107 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="max-w-7xl mx-auto bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-6">
+  <div class="flex justify-between items-center mb-6">
+    <h1 class="text-2xl font-semibold">Job Moderation</h1>
+    <a href="{% url 'jobs:job_list' %}" class="text-indigo-600 hover:text-indigo-500">Back to Jobs</a>
+  </div>
+
+  <div class="mb-6 space-y-4">
+    <form method="get" class="flex gap-4">
+      <input type="text" name="q" value="{{ search_query }}" placeholder="Search jobs..." class="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-md" />
+      <button type="submit" class="bg-indigo-600 text-white px-6 py-2 rounded-md hover:bg-indigo-500">Search</button>
+    </form>
+
+    <div class="border-b border-gray-200 dark:border-gray-700">
+      <nav class="-mb-px flex space-x-8 text-sm font-medium">
+        <a href="?status=all{% if search_query %}&q={{ search_query|urlencode }}{% endif %}" class="{% if status_filter == 'all' %}border-b-2 border-indigo-500 text-indigo-600{% else %}text-gray-500 hover:text-gray-700 hover:border-gray-300{% endif %} py-2 px-1">All ({{ status_counts.all }})</a>
+        <a href="?status=active{% if search_query %}&q={{ search_query|urlencode }}{% endif %}" class="{% if status_filter == 'active' %}border-b-2 border-green-500 text-green-600{% else %}text-gray-500 hover:text-gray-700 hover:border-gray-300{% endif %} py-2 px-1">Active ({{ status_counts.active }})</a>
+        <a href="?status=pending{% if search_query %}&q={{ search_query|urlencode }}{% endif %}" class="{% if status_filter == 'pending' %}border-b-2 border-yellow-500 text-yellow-600{% else %}text-gray-500 hover:text-gray-700 hover:border-gray-300{% endif %} py-2 px-1">Pending ({{ status_counts.pending }})</a>
+        <a href="?status=flagged{% if search_query %}&q={{ search_query|urlencode }}{% endif %}" class="{% if status_filter == 'flagged' %}border-b-2 border-orange-500 text-orange-600{% else %}text-gray-500 hover:text-gray-700 hover:border-gray-300{% endif %} py-2 px-1">Flagged ({{ status_counts.flagged }})</a>
+        <a href="?status=removed{% if search_query %}&q={{ search_query|urlencode }}{% endif %}" class="{% if status_filter == 'removed' %}border-b-2 border-red-500 text-red-600{% else %}text-gray-500 hover:text-gray-700 hover:border-gray-300{% endif %} py-2 px-1">Removed ({{ status_counts.removed }})</a>
+      </nav>
+    </div>
+  </div>
+
+  {% if page_obj %}
+    <div class="space-y-4">
+      {% for job in page_obj %}
+        <div class="border border-gray-200 dark:border-gray-700 rounded-lg p-4 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+          <div class="flex justify-between items-start">
+            <div class="flex-1">
+              <div class="flex items-center space-x-3">
+                <h3 class="text-lg font-semibold">{{ job.title }}</h3>
+                <span class="px-2 py-1 text-xs rounded-full
+                  {% if job.moderation_status == 'active' %}bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200
+                  {% elif job.moderation_status == 'pending' %}bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200
+                  {% elif job.moderation_status == 'flagged' %}bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200
+                  {% elif job.moderation_status == 'removed' %}bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200
+                  {% endif %}">
+                  {{ job.get_moderation_status_display }}
+                </span>
+              </div>
+              <p class="text-gray-600 dark:text-gray-400 text-sm mt-1">
+                <strong>Company:</strong> {{ job.company }} ·
+                <strong>Posted by:</strong> {{ job.posted_by.username|default:"Unknown" }} ·
+                <strong>Created:</strong> {{ job.created_at|date:"M d, Y" }}
+              </p>
+              {% if job.moderation_reason %}
+                <p class="text-sm text-gray-600 dark:text-gray-400 mt-2"><strong>Reason:</strong> {{ job.moderation_reason }}</p>
+              {% endif %}
+              {% if job.moderated_by %}
+                <p class="text-xs text-gray-500 dark:text-gray-500 mt-1">Last action by {{ job.moderated_by.username }} on {{ job.moderated_at|date:"M d, Y g:i A" }}</p>
+              {% endif %}
+              <p class="text-sm text-gray-600 dark:text-gray-400 mt-3 line-clamp-2">{{ job.description|truncatewords:30 }}</p>
+            </div>
+            <a href="{% url 'jobs:job_detail_moderation' job.id %}" class="ml-4 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 px-3 py-1 rounded text-sm hover:bg-gray-200 dark:hover:bg-gray-600">View Details</a>
+          </div>
+          <div class="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700 flex flex-wrap gap-2">
+            <form method="post" action="{% url 'jobs:moderate_job_action' job.id %}" class="flex flex-wrap gap-2">
+              {% csrf_token %}
+              <input type="hidden" name="status_filter" value="{{ status_filter }}">
+              {% if job.moderation_status != 'active' %}
+                <button type="submit" name="action" value="approve" class="bg-green-600 text-white px-3 py-1 rounded text-sm hover:bg-green-500">Approve</button>
+              {% endif %}
+              {% if job.moderation_status != 'removed' %}
+                <button type="submit" name="action" value="remove" class="bg-red-600 text-white px-3 py-1 rounded text-sm hover:bg-red-500" onclick="return confirm('Remove this job?')">Remove</button>
+              {% endif %}
+              {% if job.moderation_status != 'flagged' %}
+                <button type="submit" name="action" value="flag" class="bg-orange-600 text-white px-3 py-1 rounded text-sm hover:bg-orange-500">Flag</button>
+              {% endif %}
+              {% if job.moderation_status != 'pending' %}
+                <button type="submit" name="action" value="pending" class="bg-yellow-600 text-white px-3 py-1 rounded text-sm hover:bg-yellow-500">Set Pending</button>
+              {% endif %}
+            </form>
+          </div>
+        </div>
+      {% endfor %}
+    </div>
+
+    <div class="mt-6 flex items-center justify-between text-sm">
+      {% if page_obj.has_previous %}
+        <a href="?page={{ page_obj.previous_page_number }}{% if status_filter %}&status={{ status_filter }}{% endif %}{% if search_query %}&q={{ search_query|urlencode }}{% endif %}" class="px-3 py-1.5 border rounded hover:bg-gray-100 dark:hover:bg-gray-700">Previous</a>
+      {% else %}
+        <span></span>
+      {% endif %}
+      <span>Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
+      {% if page_obj.has_next %}
+        <a href="?page={{ page_obj.next_page_number }}{% if status_filter %}&status={{ status_filter }}{% endif %}{% if search_query %}&q={{ search_query|urlencode }}{% endif %}" class="px-3 py-1.5 border rounded hover:bg-gray-100 dark:hover:bg-gray-700">Next</a>
+      {% else %}
+        <span></span>
+      {% endif %}
+    </div>
+  {% else %}
+    <div class="text-center py-12 text-gray-500 dark:text-gray-400">No jobs found.</div>
+  {% endif %}
+</div>
+{% endblock %}
+{
+  "cells": [],
+  "metadata": {
+    "language_info": {
+      "name": "python"
+    }
+  },
+  "nbformat": 4,
+  "nbformat_minor": 2
+}
