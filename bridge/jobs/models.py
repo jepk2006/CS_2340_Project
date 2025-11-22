@@ -1,5 +1,7 @@
 from django.db import models
 from django.contrib.auth import get_user_model
+from django.db.models import Count
+from django.utils import timezone
 
 
 class Skill(models.Model):
@@ -64,6 +66,28 @@ class Job(models.Model):
 
     def __str__(self):
         return f"{self.title} @ {self.company}"
+
+    def get_recommended_candidates(self):
+        job_skills = self.skills.all()
+        if not job_skills:
+            return JobSeekerProfile.objects.none()
+
+        # Filter job seekers who have at least one skill matching the job's skills
+        # and annotate with a similarity score (count of matching skills)
+        recommended_profiles = (
+            JobSeekerProfile.objects.filter(
+                skills__in=job_skills,
+                account_type=JobSeekerProfile.AccountType.JOB_SEEKER,
+                visibility__in=[
+                    JobSeekerProfile.Visibility.PUBLIC,
+                    JobSeekerProfile.Visibility.RECRUITERS,
+                ],
+            )
+            .annotate(similarity_score=Count("skills", filter=models.Q(skills__in=job_skills)))
+            .order_by("-similarity_score", "-updated_at")
+            .distinct()
+        )
+        return recommended_profiles
 
 
 class Application(models.Model):

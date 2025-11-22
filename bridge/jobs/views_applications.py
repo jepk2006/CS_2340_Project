@@ -10,8 +10,8 @@ import json
 from .models import Application, Job
 from accounts.models import JobSeekerProfile
 from .forms import (
-    ApplicationStatusForm, 
-    ApplicationNotesForm, 
+    ApplicationStatusForm,
+    ApplicationNotesForm,
     ApplicationPriorityForm,
     ApplicationFilterForm
 )
@@ -46,7 +46,7 @@ def my_applications(request):
 @login_required
 def recruiter_applications(request):
     """Enhanced Kanban-style view for recruiters to manage applicants"""
-    
+
     # Handle status updates via POST
     if request.method == "POST":
         application_id = request.POST.get("application_id")
@@ -61,13 +61,14 @@ def recruiter_applications(request):
 
     # Initialize filter form
     filter_form = ApplicationFilterForm(request.GET or None, user=request.user)
-    
+    show_recommendations = request.GET.get("show_recommendations") == "true"
+
     # Base queryset - all applications for jobs posted by this recruiter
     qs = Application.objects.filter(
         job__posted_by=request.user
     ).select_related(
-        "job", 
-        "applicant", 
+        "job",
+        "applicant",
         "applicant__jobseeker_profile"
     ).prefetch_related(
         "applicant__jobseeker_profile__skills"
@@ -78,19 +79,19 @@ def recruiter_applications(request):
         # Filter by job
         if filter_form.cleaned_data.get('job'):
             qs = qs.filter(job=filter_form.cleaned_data['job'])
-        
+
         # Filter by status
         if filter_form.cleaned_data.get('status'):
             qs = qs.filter(status=filter_form.cleaned_data['status'])
-        
+
         # Filter by priority
         if filter_form.cleaned_data.get('priority'):
             qs = qs.filter(priority=filter_form.cleaned_data['priority'])
-        
+
         # Filter flagged only
         if filter_form.cleaned_data.get('flagged_only'):
             qs = qs.filter(flagged=True)
-        
+
         # Search by name or email
         search_query = filter_form.cleaned_data.get('search')
         if search_query:
@@ -105,12 +106,17 @@ def recruiter_applications(request):
     jobs_map = {}
     for app in qs:
         if app.job not in jobs_map:
-            jobs_map[app.job] = {key: [] for key, _ in Application.Status.choices}
-        jobs_map[app.job][app.status].append(app)
+            jobs_map[app.job] = {'applications': {key: [] for key, _ in Application.Status.choices}, 'recommended_candidates': []}
+        jobs_map[app.job]['applications'][app.status].append(app)
 
     # Format data for template
     grouped = []
-    for job, apps_by_status in jobs_map.items():
+    for job, data in jobs_map.items():
+        apps_by_status = data['applications']
+        recommended_candidates = []
+        if show_recommendations:
+            recommended_candidates = job.get_recommended_candidates().exclude(id__in=[app.applicant.jobseeker_profile.id for status_list in apps_by_status.values() for app in status_list])[:5] # Limit to 5 recommended candidates, exclude already applied
+
         status_groups = []
         for key, label in Application.Status.choices:
             apps_in_status = apps_by_status.get(key, [])
@@ -120,11 +126,12 @@ def recruiter_applications(request):
                 "apps": apps_in_status,
                 "count": len(apps_in_status)
             })
-        
+
         grouped.append({
             "job": job,
             "status_groups": status_groups,
-            "total_applicants": sum(len(apps) for apps in apps_by_status.values())
+            "total_applicants": sum(len(apps) for apps in apps_by_status.values()),
+            "recommended_candidates": recommended_candidates,
         })
 
     # Sort jobs by company and title
@@ -143,8 +150,9 @@ def recruiter_applications(request):
         "total_applications": total_applications,
         "flagged_count": flagged_count,
         "high_priority_count": high_priority_count,
+        "show_recommendations": show_recommendations, # Pass the toggle state to the template
     }
-    
+
     return render(request, "applications/recruiter_applications.html", context)
 
 
@@ -156,33 +164,33 @@ def update_application_status(request):
         data = json.loads(request.body)
         app_id = data.get('application_id')
         new_status = data.get('status')
-        
+
         if not app_id or not new_status:
             return JsonResponse({'error': 'Missing application_id or status'}, status=400)
-        
+
         # Validate status
         valid_statuses = [choice[0] for choice in Application.Status.choices]
         if new_status not in valid_statuses:
             return JsonResponse({'error': 'Invalid status'}, status=400)
-        
+
         # Get application and check permissions
         app = get_object_or_404(Application, pk=app_id)
-        
+
         # Only allow recruiters (job posters) to modify application status
         if app.job.posted_by != request.user:
             return JsonResponse({'error': 'Permission denied. Only recruiters can change application status.'}, status=403)
-        
+
         # Update status
         app.status = new_status
         app.save()
-        
+
         return JsonResponse({
             'success': True,
             'application_id': app_id,
             'status': new_status,
             'status_display': app.get_status_display()
         })
-        
+
     except json.JSONDecodeError as e:
         return JsonResponse({'error': f'Invalid JSON: {str(e)}'}, status=400)
     except Exception as e:
@@ -199,23 +207,23 @@ def application_detail(request, pk):
         Application.objects.select_related('job', 'applicant', 'applicant__jobseeker_profile'),
         pk=pk
     )
-    
+
     # Check permissions - must be recruiter who posted the job or the applicant
     if application.job.posted_by != request.user and application.applicant != request.user:
         messages.error(request, "You don't have permission to view this application.")
         return redirect('jobs:job_list')
-    
+
     # Handle notes form submission (recruiter only)
     if request.method == 'POST' and application.job.posted_by == request.user:
         action = request.POST.get('action')
-        
+
         if action == 'update_notes':
             notes_form = ApplicationNotesForm(request.POST, instance=application)
             if notes_form.is_valid():
                 notes_form.save()
                 messages.success(request, "Notes updated successfully.")
                 return redirect('applications:application_detail', pk=pk)
-        
+
         elif action == 'update_status':
             new_status = request.POST.get('status')
             if new_status in dict(Application.Status.choices):
@@ -223,7 +231,7 @@ def application_detail(request, pk):
                 application.save()
                 messages.success(request, f"Status updated to {application.get_status_display()}.")
                 return redirect('applications:application_detail', pk=pk)
-        
+
         elif action == 'update_priority':
             new_priority = request.POST.get('priority')
             if new_priority in dict(Application.Priority.choices):
@@ -231,18 +239,18 @@ def application_detail(request, pk):
                 application.save()
                 messages.success(request, f"Priority updated to {application.get_priority_display()}.")
                 return redirect('applications:application_detail', pk=pk)
-        
+
         elif action == 'toggle_flag':
             application.flagged = not application.flagged
             application.save()
             messages.success(request, f"Application {'flagged' if application.flagged else 'unflagged'}.")
             return redirect('applications:application_detail', pk=pk)
-    
+
     # Initialize forms
     notes_form = ApplicationNotesForm(instance=application)
     status_form = ApplicationStatusForm(instance=application)
     priority_form = ApplicationPriorityForm(instance=application)
-    
+
     context = {
         'application': application,
         'notes_form': notes_form,
@@ -250,7 +258,7 @@ def application_detail(request, pk):
         'priority_form': priority_form,
         'is_recruiter': application.job.posted_by == request.user,
     }
-    
+
     return render(request, 'applications/application_detail.html', context)
 
 
@@ -261,9 +269,9 @@ def toggle_flag(request, pk):
     application = get_object_or_404(Application, pk=pk, job__posted_by=request.user)
     application.flagged = not application.flagged
     application.save()
-    
+
     messages.success(request, f"Application {'flagged' if application.flagged else 'unflagged'}.")
-    
+
     # Redirect back to the referring page or kanban view
     return redirect(request.META.get('HTTP_REFERER', 'applications:recruiter_applications'))
 
@@ -274,14 +282,14 @@ def update_priority(request, pk):
     """Quick update priority for an application"""
     application = get_object_or_404(Application, pk=pk, job__posted_by=request.user)
     new_priority = request.POST.get('priority')
-    
+
     if new_priority in dict(Application.Priority.choices):
         application.priority = new_priority
         application.save()
         messages.success(request, f"Priority updated to {application.get_priority_display()}.")
     else:
         messages.error(request, "Invalid priority value.")
-    
+
     return redirect(request.META.get('HTTP_REFERER', 'applications:recruiter_applications'))
 
 
@@ -291,21 +299,21 @@ def bulk_update_status(request):
     """Bulk update status for multiple applications"""
     application_ids = request.POST.getlist('application_ids')
     new_status = request.POST.get('bulk_status')
-    
+
     if not application_ids or not new_status:
         messages.error(request, "Please select applications and a status.")
         return redirect('applications:recruiter_applications')
-    
+
     if new_status not in dict(Application.Status.choices):
         messages.error(request, "Invalid status selected.")
         return redirect('applications:recruiter_applications')
-    
+
     # Update applications (only those posted by this user)
     updated_count = Application.objects.filter(
         id__in=application_ids,
         job__posted_by=request.user
     ).update(status=new_status)
-    
+
     messages.success(request, f"Updated {updated_count} application(s) to {dict(Application.Status.choices)[new_status]}.")
     return redirect('applications:recruiter_applications')
 
