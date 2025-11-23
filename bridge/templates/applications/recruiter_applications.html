@@ -55,12 +55,6 @@
             <span class="text-sm text-gray-700 dark:text-gray-300">Flagged only</span>
           </label>
         </div>
-        <div class="flex items-end">
-          <label class="flex items-center space-x-2 cursor-pointer">
-            <input type="checkbox" name="show_recommendations" value="true" {% if show_recommendations %}checked{% endif %} class="rounded border-gray-300 text-indigo-600 shadow-sm focus:ring-indigo-500 dark:bg-gray-700 dark:border-gray-600" />
-            <span class="text-sm text-gray-700 dark:text-gray-300">Show Recommendations</span>
-          </label>
-        </div>
       </div>
       <div class="flex justify-end space-x-2">
         <a href="{% url 'applications:recruiter_applications' %}" class="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition">
@@ -102,30 +96,6 @@
           </div>
         </div>
       </div>
-
-      <!-- Recommended Candidates Section -->
-      {% if item.recommended_candidates %}
-        <div class="p-4 border-b border-gray-200 dark:border-gray-700 bg-indigo-50 dark:bg-indigo-900/10">
-          <h3 class="text-lg font-semibold text-indigo-700 dark:text-indigo-300 mb-3">Recommended Candidates</h3>
-          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-            {% for profile in item.recommended_candidates %}
-              <a href="#" class="block bg-white dark:bg-gray-800 rounded-lg p-3 border border-indigo-200 dark:border-indigo-700 shadow-sm hover:shadow-md transition">
-                <div class="font-semibold text-sm text-gray-900 dark:text-white">{{ profile.user.get_full_name|default:profile.user.username }}</div>
-                <div class="text-xs text-gray-600 dark:text-gray-400">{{ profile.headline|default:"No headline" }}</div>
-                <div class="mt-2 flex flex-wrap gap-1">
-                  {% for skill in profile.skills.all|slice:":3" %}
-                    <span class="text-xs bg-indigo-100 dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300 px-2 py-0.5 rounded">{{ skill.name }}</span>
-                  {% endfor %}
-                  {% if profile.skills.count > 3 %}
-                    <span class="text-xs text-gray-500">+{{ profile.skills.count|add:"-3" }} more</span>
-                  {% endif %}
-                </div>
-                <div class="mt-2 text-xs text-indigo-600 dark:text-indigo-400">Similarity Score: {{ profile.similarity_score }}</div>
-              </a>
-            {% endfor %}
-          </div>
-        </div>
-      {% endif %}
 
       <!-- Kanban Columns -->
       <div class="p-4">

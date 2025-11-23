@@ -1,6 +1,7 @@
 from django import forms
 from .models import SavedSearch, JobSeekerProfile, Message
 from jobs.models import Skill
+from django.contrib.auth import get_user_model # Restored get_user_model
 
 
 class SavedSearchForm(forms.ModelForm):
@@ -94,6 +95,18 @@ class JobSeekerProfileForm(forms.ModelForm):
         # If commit is False, the m2m data needs to be saved manually later
         # No self.save_m2m() here as we handle it manually.
         return instance
+
+
+class UserProfileForm(forms.ModelForm):
+    class Meta:
+        model = get_user_model() # Reverted to direct model call
+        fields = ['email']
+        widgets = {
+            'email': forms.EmailInput(attrs={'placeholder': 'Your email address', 'required': 'true'})
+        }
+        labels = {
+            'email': 'Email Address'
+        }
 
 
 class MessageForm(forms.ModelForm):

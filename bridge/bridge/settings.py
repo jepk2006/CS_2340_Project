@@ -37,6 +37,7 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
+    "django.contrib.humanize", # Added for human-readable numbers
     "widget_tweaks", # Added for improved form rendering
     # Third-party
     "django_filters",

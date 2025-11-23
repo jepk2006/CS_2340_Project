@@ -61,7 +61,6 @@ def recruiter_applications(request):
 
     # Initialize filter form
     filter_form = ApplicationFilterForm(request.GET or None, user=request.user)
-    show_recommendations = request.GET.get("show_recommendations") == "true"
 
     # Base queryset - all applications for jobs posted by this recruiter
     qs = Application.objects.filter(
@@ -113,9 +112,6 @@ def recruiter_applications(request):
     grouped = []
     for job, data in jobs_map.items():
         apps_by_status = data['applications']
-        recommended_candidates = []
-        if show_recommendations:
-            recommended_candidates = job.get_recommended_candidates().exclude(id__in=[app.applicant.jobseeker_profile.id for status_list in apps_by_status.values() for app in status_list])[:5] # Limit to 5 recommended candidates, exclude already applied
 
         status_groups = []
         for key, label in Application.Status.choices:
@@ -131,7 +127,6 @@ def recruiter_applications(request):
             "job": job,
             "status_groups": status_groups,
             "total_applicants": sum(len(apps) for apps in apps_by_status.values()),
-            "recommended_candidates": recommended_candidates,
         })
 
     # Sort jobs by company and title
@@ -150,7 +145,6 @@ def recruiter_applications(request):
         "total_applications": total_applications,
         "flagged_count": flagged_count,
         "high_priority_count": high_priority_count,
-        "show_recommendations": show_recommendations, # Pass the toggle state to the template
     }
 
     return render(request, "applications/recruiter_applications.html", context)

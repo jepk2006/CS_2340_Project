@@ -1,0 +1,150 @@
+{% extends "base.html" %}
+{% load humanize %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-8">
+    <div class="flex items-center justify-between mb-6">
+        <h1 class="text-3xl font-bold text-gray-900 dark:text-white">Profile: {{ profile.user.username }}</h1>
+        {% if is_owner %}
+            <a href="{% url 'accounts:profile_edit' %}" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                Edit Profile
+            </a>
+        {% elif is_recruiter and profile.visibility != 'private' %}
+            <a href="{% url 'accounts:start_conversation' profile.user.id %}" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500">
+                Message Candidate
+            </a>
+        {% endif %}
+    </div>
+
+    <div class="bg-white dark:bg-gray-800 shadow overflow-hidden sm:rounded-lg mb-8">
+        <div class="px-4 py-5 sm:px-6">
+            <h3 class="text-lg leading-6 font-medium text-gray-900 dark:text-white">Personal Information</h3>
+            <p class="mt-1 max-w-2xl text-sm text-gray-500 dark:text-gray-400">Details about the user's profile.</p>
+        </div>
+        <div class="border-t border-gray-200 dark:border-gray-700">
+            <dl>
+                <div class="bg-gray-50 dark:bg-gray-700 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
+                    <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">Username</dt>
+                    <dd class="mt-1 text-sm text-gray-900 dark:text-white sm:mt-0 sm:col-span-2">{{ profile.user.username }}</dd>
+                </div>
+                <div class="bg-white dark:bg-gray-800 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
+                    <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">Email address</dt>
+                    <dd class="mt-1 text-sm text-gray-900 dark:text-white sm:mt-0 sm:col-span-2">
+                        {% if profile.user.email and is_owner or profile.show_email %}
+                            {{ profile.user.email }}
+                        {% else %}
+                            <span class="text-gray-400">Not visible</span>
+                        {% endif %}
+                    </dd>
+                </div>
+                <div class="bg-gray-50 dark:bg-gray-700 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
+                    <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">Account Type</dt>
+                    <dd class="mt-1 text-sm text-gray-900 dark:text-white sm:mt-0 sm:col-span-2">{{ profile.get_account_type_display }}</dd>
+                </div>
+                {% if profile.headline %}
+                <div class="bg-white dark:bg-gray-800 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
+                    <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">Headline</dt>
+                    <dd class="mt-1 text-sm text-gray-900 dark:text-white sm:mt-0 sm:col-span-2">{{ profile.headline }}</dd>
+                </div>
+                {% endif %}
+                {% if profile.bio %}
+                <div class="bg-gray-50 dark:bg-gray-700 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
+                    <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">Bio</dt>
+                    <dd class="mt-1 text-sm text-gray-900 dark:text-white sm:mt-0 sm:col-span-2">{{ profile.bio|linebreaksbr }}</dd>
+                </div>
+                {% endif %}
+                {% if profile.location_city or profile.location_state or profile.location_country %}
+                <div class="bg-white dark:bg-gray-800 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
+                    <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">Location</dt>
+                    <dd class="mt-1 text-sm text-gray-900 dark:text-white sm:mt-0 sm:col-span-2">
+                        {{ profile.location_city }}{% if profile.location_city and profile.location_state %}, {% endif %}
+                        {{ profile.location_state }}{% if profile.location_state and profile.location_country %}, {% endif %}
+                        {{ profile.location_country }}
+                    </dd>
+                </div>
+                {% endif %}
+                {% if profile.commute_radius and profile.commute_radius > 0 %}
+                <div class="bg-gray-50 dark:bg-gray-700 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
+                    <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">Commute Radius</dt>
+                    <dd class="mt-1 text-sm text-gray-900 dark:text-white sm:mt-0 sm:col-span-2">{{ profile.commute_radius }} miles</dd>
+                </div>
+                {% endif %}
+                {% if profile.visibility %}
+                <div class="bg-white dark:bg-gray-800 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
+                    <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">Visibility</dt>
+                    <dd class="mt-1 text-sm text-gray-900 dark:text-white sm:mt-0 sm:col-span-2">{{ profile.get_visibility_display }}</dd>
+                </div>
+                {% endif %}
+            </dl>
+        </div>
+    </div>
+
+    {% if profile.skills.all %}
+    <div class="bg-white dark:bg-gray-800 shadow overflow-hidden sm:rounded-lg mb-8">
+        <div class="px-4 py-5 sm:px-6">
+            <h3 class="text-lg leading-6 font-medium text-gray-900 dark:text-white">Skills</h3>
+        </div>
+        <div class="border-t border-gray-200 dark:border-gray-700 px-4 py-5 sm:px-6">
+            <div class="flex flex-wrap gap-2">
+                {% for skill in profile.skills.all %}
+                    <span class="inline-flex items-center px-3 py-0.5 rounded-full text-sm font-medium bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-200">
+                        {{ skill.name }}
+                    </span>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    {% if profile.education or profile.experience %}
+    <div class="bg-white dark:bg-gray-800 shadow overflow-hidden sm:rounded-lg mb-8">
+        <div class="px-4 py-5 sm:px-6">
+            <h3 class="text-lg leading-6 font-medium text-gray-900 dark:text-white">Education & Experience</h3>
+        </div>
+        <div class="border-t border-gray-200 dark:border-gray-700">
+            {% if profile.education %}
+            <div class="bg-gray-50 dark:bg-gray-700 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
+                <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">Education</dt>
+                <dd class="mt-1 text-sm text-gray-900 dark:text-white sm:mt-0 sm:col-span-2">{{ profile.education|linebreaksbr }}</dd>
+            </div>
+            {% endif %}
+            {% if profile.experience %}
+            <div class="bg-white dark:bg-gray-800 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
+                <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">Experience</dt>
+                <dd class="mt-1 text-sm text-gray-900 dark:text-white sm:mt-0 sm:col-span-2">{{ profile.experience|linebreaksbr }}</dd>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
+
+    {% if profile.portfolio_url or profile.linkedin_url or profile.github_url %}
+    <div class="bg-white dark:bg-gray-800 shadow overflow-hidden sm:rounded-lg mb-8">
+        <div class="px-4 py-5 sm:px-6">
+            <h3 class="text-lg leading-6 font-medium text-gray-900 dark:text-white">Links</h3>
+        </div>
+        <div class="border-t border-gray-200 dark:border-gray-700">
+            {% if profile.portfolio_url %}
+            <div class="bg-gray-50 dark:bg-gray-700 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
+                <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">Portfolio</dt>
+                <dd class="mt-1 text-sm text-gray-900 dark:text-white sm:mt-0 sm:col-span-2"><a href="{{ profile.portfolio_url }}" target="_blank" class="text-indigo-600 hover:text-indigo-800">{{ profile.portfolio_url }}</a></dd>
+            </div>
+            {% endif %}
+            {% if profile.linkedin_url %}
+            <div class="bg-white dark:bg-gray-800 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
+                <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">LinkedIn</dt>
+                <dd class="mt-1 text-sm text-gray-900 dark:text-white sm:mt-0 sm:col-span-2"><a href="{{ profile.linkedin_url }}" target="_blank" class="text-indigo-600 hover:text-indigo-800">{{ profile.linkedin_url }}</a></dd>
+            </div>
+            {% endif %}
+            {% if profile.github_url %}
+            <div class="bg-gray-50 dark:bg-gray-700 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
+                <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">GitHub</dt>
+                <dd class="mt-1 text-sm text-gray-900 dark:text-white sm:mt-0 sm:col-span-2"><a href="{{ profile.github_url }}" target="_blank" class="text-indigo-600 hover:text-indigo-800">{{ profile.github_url }}</a></dd>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
+
+</div>
+{% endblock %}

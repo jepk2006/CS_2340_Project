@@ -68,6 +68,7 @@ class Job(models.Model):
         return f"{self.title} @ {self.company}"
 
     def get_recommended_candidates(self):
+        from accounts.models import JobSeekerProfile # Moved import here to resolve circular dependency
         job_skills = self.skills.all()
         if not job_skills:
             return JobSeekerProfile.objects.none()

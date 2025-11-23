@@ -12,7 +12,7 @@ import csv
 from datetime import datetime
 
 from .models import JobSeekerProfile, SavedSearch, TalentMessage, Conversation, Message
-from .forms import SavedSearchForm, JobSeekerProfileForm, MessageForm
+from .forms import SavedSearchForm, JobSeekerProfileForm, MessageForm, UserProfileForm # Added UserProfileForm
 from jobs.models import Skill, Job, Application
 from jobs.decorators import recruiter_required, admin_required
 
@@ -20,21 +20,54 @@ from jobs.decorators import recruiter_required, admin_required
 
 
 @login_required
-def profile_edit(request):
-    profile, _ = JobSeekerProfile.objects.get_or_create(user=request.user)
-    if request.method == "POST":
-        form = JobSeekerProfileForm(request.POST, instance=profile)
-        if form.is_valid():
-            form.save()
-            return redirect("accounts:profile_edit")
+def profile_detail(request, pk=None):
+    if pk:
+        profile = get_object_or_404(JobSeekerProfile.objects.select_related('user').prefetch_related('skills'), pk=pk)
+        if request.user == profile.user:
+            if not request.user.email:
+                messages.warning(request, "Please add an email address to your profile.")
+                return redirect("accounts:profile_edit") # Redirect to the edit view (name is profile_edit, view is profile_update)
     else:
-        form = JobSeekerProfileForm(instance=profile)
-    return render(request, "accounts/profile_edit.html", {"form": form})
+        profile = get_object_or_404(JobSeekerProfile.objects.select_related('user').prefetch_related('skills'), user=request.user)
+        if not request.user.email:
+            messages.warning(request, "Please add an email address to your profile.")
+            return redirect("accounts:profile_edit") # Redirect to the edit view (name is profile_edit, view is profile_update)
+
+    context = {
+        "profile": profile,
+        "is_owner": request.user == profile.user,
+        "is_recruiter": hasattr(request.user, 'jobseeker_profile') and request.user.jobseeker_profile.account_type == JobSeekerProfile.AccountType.RECRUITER if request.user.is_authenticated else False
+    }
+    return render(request, "accounts/profile_detail.html", context)
+
+
+@login_required
+def profile_update(request): # Renamed from profile_edit
+    profile, created = JobSeekerProfile.objects.get_or_create(user=request.user)
+
+    if request.method == "POST":
+        profile_form = JobSeekerProfileForm(request.POST, instance=profile)
+        user_form = UserProfileForm(request.POST, instance=request.user)
+        if profile_form.is_valid() and user_form.is_valid():
+            profile_form.save()
+            user_form.save()
+            messages.success(request, "Profile updated successfully!")
+            return redirect("accounts:profile_detail") # Redirect to detail view after update
+    else:
+        profile_form = JobSeekerProfileForm(instance=profile)
+        user_form = UserProfileForm(instance=request.user)
+
+    context = {
+        "profile_form": profile_form,
+        "user_form": user_form,
+        "profile_exists": not created,
+    }
+    return render(request, "accounts/profile_edit.html", context)
 
 
 class SignupForm(Form):
     username = CharField(max_length=150)
-    email = EmailField(required=False)
+    email = EmailField(required=True) # Made email required
     password = CharField(widget=PasswordInput)
     account_type = ChoiceField(choices=JobSeekerProfile.AccountType.choices)
 
@@ -68,7 +101,8 @@ def signup(request):
                 user.is_staff = True
                 user.save()
             login(request, user)
-            return redirect("jobs:job_list")
+            messages.success(request, "Account created successfully! Please complete your profile.")
+            return redirect("accounts:profile_detail") # Redirect to profile detail after signup
     else:
         form = SignupForm()
     return render(request, "accounts/signup.html", {"form": form})
@@ -77,10 +111,15 @@ def signup(request):
 def recruiter_talent_search(request):
     query = request.GET.get("q", "").strip()
     skill_ids = request.GET.getlist("skills")
+    other_skills_raw = request.GET.get("other_skills", "").strip() # Added for compatibility
     location_city = request.GET.get("city", "").strip()
     location_state = request.GET.get("state", "").strip()
     location_country = request.GET.get("country", "").strip()
     saved_search_id = request.GET.get("saved_search")
+    recommend_job_id = request.GET.get("recommend_job_id") # New parameter for job recommendations
+    
+    user_posted_jobs = Job.objects.filter(posted_by=request.user) # Fetch user's posted jobs for recommendations
+    recommended_job = None
 
     # If loading a saved search, populate the form with its criteria
     saved_search = None
@@ -89,42 +128,69 @@ def recruiter_talent_search(request):
             saved_search = SavedSearch.objects.get(id=saved_search_id, recruiter=request.user)
             query = saved_search.query
             skill_ids = list(saved_search.skills.values_list('id', flat=True))
+            # Assuming SavedSearch model has other_skills ManyToMany, otherwise this will cause an error.
+            # For now, let's assume it's a CharField as in forms, so we load it directly
+            other_skills_raw = saved_search.other_skills # Load other_skills from model
             location_city = saved_search.location_city
             location_state = saved_search.location_state
             location_country = saved_search.location_country
         except SavedSearch.DoesNotExist:
             pass
 
-    profiles = JobSeekerProfile.objects.all()
-    # Recruiters see public and recruiters-only profiles
-    profiles = profiles.filter(
-        visibility__in=[JobSeekerProfile.Visibility.PUBLIC, JobSeekerProfile.Visibility.RECRUITERS],
-        account_type=JobSeekerProfile.AccountType.JOB_SEEKER
-    )
-
-    if query:
+    # Handle job recommendations - clear other filters if a job is selected
+    if recommend_job_id:
+        try:
+            recommended_job = Job.objects.get(id=recommend_job_id, posted_by=request.user)
+            # Clear other search criteria if recommending for a job
+            query = ""
+            skill_ids = []
+            other_skills_raw = ""
+            location_city = ""
+            location_state = ""
+            location_country = ""
+            profiles = recommended_job.get_recommended_candidates()
+            # Prepare a list of skill names for the recommended job
+            recommended_job_skill_names = [skill.name for skill in recommended_job.skills.all()]
+        except Job.DoesNotExist:
+            messages.error(request, "The specified job for recommendations does not exist or you don't own it.")
+            return redirect("accounts:recruiter_talent_search")
+    else:
+        profiles = JobSeekerProfile.objects.all()
+        # Recruiters see public and recruiters-only profiles
         profiles = profiles.filter(
-            Q(user__username__icontains=query)
-            | Q(headline__icontains=query)
-            | Q(bio__icontains=query)
-            | Q(education__icontains=query)
-            | Q(experience__icontains=query)
-            | Q(portfolio_url__icontains=query)
-            | Q(linkedin_url__icontains=query)
-            | Q(github_url__icontains=query)
+            visibility__in=[JobSeekerProfile.Visibility.PUBLIC, JobSeekerProfile.Visibility.RECRUITERS],
+            account_type=JobSeekerProfile.AccountType.JOB_SEEKER
         )
 
-    if skill_ids:
-        profiles = profiles.filter(skills__in=skill_ids).distinct()
+        if query:
+            profiles = profiles.filter(
+                Q(user__username__icontains=query)
+                | Q(headline__icontains=query)
+                | Q(bio__icontains=query)
+                | Q(education__icontains=query)
+                | Q(experience__icontains=query)
+                | Q(portfolio_url__icontains=query)
+                | Q(linkedin_url__icontains=query)
+                | Q(github_url__icontains=query)
+            )
 
-    if location_city:
-        profiles = profiles.filter(location_city__icontains=location_city)
-    if location_state:
-        profiles = profiles.filter(location_state__icontains=location_state)
-    if location_country:
-        profiles = profiles.filter(location_country__icontains=location_country)
+        # Process other_skills for filtering
+        if other_skills_raw:
+            other_skill_names = [s.strip() for s in other_skills_raw.split(',') if s.strip()]
+            for skill_name in other_skill_names:
+                profiles = profiles.filter(skills__name__iexact=skill_name).distinct()
 
-    # Only show candidates with at least one skill filled out
+        if skill_ids:
+            profiles = profiles.filter(skills__in=skill_ids).distinct()
+
+        if location_city:
+            profiles = profiles.filter(location_city__icontains=location_city)
+        if location_state:
+            profiles = profiles.filter(location_state__icontains=location_state)
+        if location_country:
+            profiles = profiles.filter(location_country__icontains=location_country)
+
+    # Only show candidates with at least one skill filled out and select related/prefetch related
     profiles = profiles.filter(skills__isnull=False).select_related("user").prefetch_related("skills").distinct().order_by("-updated_at")
 
     paginator = Paginator(profiles, 12)
@@ -142,13 +208,17 @@ def recruiter_talent_search(request):
         "page_obj": page_obj,
         "skills": all_skills,
         "selected_skills": [int(s) if isinstance(s, str) else s for s in skill_ids if str(s).isdigit()],
+        "other_skills_raw": other_skills_raw, # Pass raw other skills to context
         "query": query,
         "city": location_city,
         "state": location_state,
         "country": location_country,
         "saved_searches": user_saved_searches,
         "current_saved_search": saved_search,
-        "has_search_criteria": bool(query or skill_ids or location_city or location_state or location_country),
+        "has_search_criteria": bool(query or skill_ids or other_skills_raw or location_city or location_state or location_country),
+        "user_posted_jobs": user_posted_jobs, # Pass user's posted jobs to context
+        "recommended_job": recommended_job, # Pass recommended job to context
+        "recommended_job_skill_names": recommended_job_skill_names if recommended_job else [], # Pass skill names for matching
     }
     return render(request, "accounts/recruiter_search.html", context)
 
@@ -160,6 +230,7 @@ def save_search(request):
     name = request.POST.get('name', '').strip()
     query = request.POST.get('query', '').strip()
     skill_ids = request.POST.getlist('skills')
+    other_skills_raw = request.POST.get('other_skills', '').strip() # Added other_skills_raw
     location_city = request.POST.get('city', '').strip()
     location_state = request.POST.get('state', '').strip()
     location_country = request.POST.get('country', '').strip()
@@ -182,9 +253,20 @@ def save_search(request):
     )
     
     # Add skills
+    all_skill_objects = []
     if skill_ids:
-        skills = Skill.objects.filter(id__in=skill_ids)
-        saved_search.skills.set(skills)
+        all_skill_objects.extend(Skill.objects.filter(id__in=skill_ids))
+    
+    if other_skills_raw:
+        new_skill_names = [s.strip() for s in other_skills_raw.split(',') if s.strip()]
+        for skill_name in new_skill_names:
+            skill, _ = Skill.objects.get_or_create(name__iexact=skill_name, defaults={'name': skill_name.title()})
+            all_skill_objects.append(skill)
+
+    # Use a set to remove duplicates before setting
+    unique_skills = list(set(all_skill_objects))
+    saved_search.skills.set(unique_skills)
+
     
     return JsonResponse({
         'success': True, 

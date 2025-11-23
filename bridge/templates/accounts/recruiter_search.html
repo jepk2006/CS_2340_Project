@@ -13,10 +13,6 @@
         📬 Messages
         <span id="unreadBadge" class="hidden absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center"></span>
       </a>
-      <a href="{% url 'accounts:saved_searches' %}" 
-         class="border-b-2 border-transparent text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 hover:border-gray-300 py-2 px-1 text-sm font-medium">
-        💾 Saved Searches
-      </a>
     </nav>
   </div>
 </div>
@@ -116,6 +112,20 @@
         </script>
         {% endblock %}
       </div>
+
+      <!-- Recommend for Job dropdown moved here -->
+      {% if user_posted_jobs %}
+        <div>
+          <label class="block text-sm mb-1">Recommend for Job</label>
+          <select name="recommend_job_id" onchange="document.getElementById('searchForm').submit()">
+            <option value="">-- Select a Job --</option>
+            {% for job in user_posted_jobs %}
+              <option value="{{ job.id }}" {% if recommended_job.id == job.id %}selected{% endif %}>{{ job.title }} ({{ job.company }})</option>
+            {% endfor %}
+          </select>
+        </div>
+      {% endif %}
+
       <button class="w-full bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-500">Apply filters</button>
       
       <!-- Save Search Button -->
@@ -133,6 +143,8 @@
         <h1 class="text-xl font-semibold">Talent Search</h1>
         {% if current_saved_search %}
           <p class="text-sm text-gray-500">Showing results for: <span class="font-medium text-indigo-600 dark:text-indigo-400">{{ current_saved_search.name }}</span></p>
+        {% elif recommended_job %}
+          <p class="text-sm text-gray-500">Showing recommendations for: <span class="font-medium text-indigo-600 dark:text-indigo-400">{{ recommended_job.title }}</span></p>
         {% endif %}
       </div>
       <span class="text-sm text-gray-500">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
@@ -156,6 +168,23 @@
                 <span class="text-xs px-2 py-0.5 rounded-full bg-gray-100 dark:bg-gray-700">{{ s.name }}</span>
               {% endfor %}
             </div>
+          {% endif %}
+
+          {% if recommended_job %}
+            {% with job_skill_names=recommended_job_skill_names %}
+              <div class="mt-2 text-sm text-indigo-600 dark:text-indigo-400">
+                <p class="font-semibold mb-1">Matching skills:</p>
+                <div class="flex flex-wrap gap-1">
+                  {% for profile_skill in profile.skills.all %}
+                    {% if profile_skill.name in job_skill_names %}
+                      <span class="text-xs px-2 py-0.5 rounded-full bg-indigo-100 dark:bg-indigo-900/50">{{ profile_skill.name }}</span>
+                    {% endif %}
+                  {% empty %}
+                    <span class="text-xs text-gray-500">No matching skills found for this job.</span>
+                  {% endfor %}
+                </div>
+              </div>
+            {% endwith %}
           {% endif %}
           
           <!-- Message Button -->
