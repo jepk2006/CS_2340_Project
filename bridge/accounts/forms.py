@@ -56,6 +56,45 @@ class JobSeekerProfileForm(forms.ModelForm):
             "account_type",
         ]
 
+    skills = forms.ModelMultipleChoiceField(
+        queryset=Skill.objects.all(),
+        widget=forms.SelectMultiple(attrs={'class': 'select2-skills form-multiselect w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100'}),
+        required=False,
+        help_text="Select skills to associate with your profile"
+    )
+
+    other_skills = forms.CharField( # New field for adding custom skills
+        max_length=500, 
+        required=False, 
+        help_text="Comma-separated new skills not in the list"
+    )
+
+    def save(self, commit=True):
+        instance = super().save(commit=False)
+        if commit:
+            instance.save()
+        
+        # Collect existing skills from the ModelMultipleChoiceField
+        selected_skills_objects = list(self.cleaned_data.get('skills', []))
+        
+        # Process other_skills and add them to the selected skills
+        other_skill_names_raw = self.cleaned_data.get('other_skills', '')
+        all_skills_to_add = set(selected_skills_objects) # Use a set to handle duplicates efficiently
+
+        if other_skill_names_raw:
+            new_skill_names = [s.strip() for s in other_skill_names_raw.split(',') if s.strip()]
+            for skill_name in new_skill_names:
+                # Normalize skill name for consistent lookup and creation
+                normalized_skill_name = skill_name.title()
+                skill, _ = Skill.objects.get_or_create(name__iexact=normalized_skill_name, defaults={'name': normalized_skill_name})
+                all_skills_to_add.add(skill)
+
+        instance.skills.set(list(all_skills_to_add)) # Convert set back to list for .set()
+
+        # If commit is False, the m2m data needs to be saved manually later
+        # No self.save_m2m() here as we handle it manually.
+        return instance
+
 
 class MessageForm(forms.ModelForm):
     """Form for composing and sending messages"""

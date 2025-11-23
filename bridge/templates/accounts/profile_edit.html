@@ -1,109 +1,165 @@
 {% extends "base.html" %}
+{% load widget_tweaks %} {# Make sure widget_tweaks is loaded #}
+
 {% block content %}
 <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
   <section class="lg:col-span-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-800 rounded-xl p-6">
+    <div class="flex items-center gap-3 mb-4">
+      <a href="{% url 'accounts:profile_detail' %}" class="text-gray-500 hover:text-gray-700 dark:hover:text-gray-300">
+        ← Back to Profile
+      </a>
+    </div>
     <h1 class="text-2xl font-semibold mb-4">Edit profile</h1>
     <form method="post" class="space-y-4">
       {% csrf_token %}
-      
-      <!-- Basic Information -->
-      <div class="space-y-4">
-        <h3 class="text-lg font-medium text-gray-900 dark:text-gray-100">Basic Information</h3>
-        <div>
-          <label for="{{ form.headline.id_for_label }}" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Headline</label>
-          {{ form.headline }}
-        </div>
-        <div>
-          <label for="{{ form.bio.id_for_label }}" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Bio</label>
-          {{ form.bio }}
-        </div>
+
+      {# User Profile Form (for email) #}
+      <div>
+        <label for="{{ user_form.email.id_for_label }}" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{{ user_form.email.label }}</label>
+        {{ user_form.email|add_class:"w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 dark:bg-gray-700 dark:text-gray-100" }}
+        {% if user_form.email.errors %}
+          <p class="text-xs text-red-600 dark:text-red-400 mt-1">{{ user_form.email.errors.0 }}</p>
+        {% endif %}
       </div>
 
-      <!-- Location & Commute -->
-      <div class="space-y-4">
-        <h3 class="text-lg font-medium text-gray-900 dark:text-gray-100">Location & Commute</h3>
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div>
-            <label for="{{ form.location_city.id_for_label }}" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">City</label>
-            {{ form.location_city }}
-          </div>
-          <div>
-            <label for="{{ form.location_state.id_for_label }}" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">State</label>
-            {{ form.location_state }}
-          </div>
-          <div>
-            <label for="{{ form.location_country.id_for_label }}" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Country</label>
-            {{ form.location_country }}
-          </div>
-        </div>
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <label for="{{ form.latitude.id_for_label }}" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Latitude</label>
-            {{ form.latitude }}
-          </div>
-          <div>
-            <label for="{{ form.longitude.id_for_label }}" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Longitude</label>
-            {{ form.longitude }}
-          </div>
-        </div>
-        <div>
-          <label for="{{ form.commute_radius.id_for_label }}" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-            Preferred Commute Radius (miles)
-          </label>
-          {{ form.commute_radius }}
-          <p class="text-sm text-gray-500 mt-1">Set your preferred commute radius to see only jobs within this distance</p>
-        </div>
+      {# JobSeeker Profile Form #}
+      <div>
+        <label for="{{ profile_form.headline.id_for_label }}" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{{ profile_form.headline.label }}</label>
+        {{ profile_form.headline|add_class:"w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 dark:bg-gray-700 dark:text-gray-100" }}
+        {% if profile_form.headline.errors %}
+          <p class="text-xs text-red-600 dark:text-red-400 mt-1">{{ profile_form.headline.errors.0 }}</p>
+        {% endif %}
       </div>
 
-      <!-- Professional Information -->
-      <div class="space-y-4">
-        <h3 class="text-lg font-medium text-gray-900 dark:text-gray-100">Professional Information</h3>
-        <div>
-          <label for="{{ form.education.id_for_label }}" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Education</label>
-          {{ form.education }}
-        </div>
-        <div>
-          <label for="{{ form.experience.id_for_label }}" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Experience</label>
-          {{ form.experience }}
-        </div>
-        <div>
-          <label for="{{ form.skills.id_for_label }}" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Skills</label>
-          {{ form.skills }}
-        </div>
+      <div>
+        <label for="{{ profile_form.bio.id_for_label }}" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{{ profile_form.bio.label }}</label>
+        {{ profile_form.bio|add_class:"w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 dark:bg-gray-700 dark:text-gray-100" }}
+        {% if profile_form.bio.errors %}
+          <p class="text-xs text-red-600 dark:text-red-400 mt-1">{{ profile_form.bio.errors.0 }}</p>
+        {% endif %}
       </div>
 
-      <!-- Links -->
-      <div class="space-y-4">
-        <h3 class="text-lg font-medium text-gray-900 dark:text-gray-100">Links</h3>
-        <div>
-          <label for="{{ form.portfolio_url.id_for_label }}" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Portfolio URL</label>
-          {{ form.portfolio_url }}
-        </div>
-        <div>
-          <label for="{{ form.linkedin_url.id_for_label }}" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">LinkedIn URL</label>
-          {{ form.linkedin_url }}
-        </div>
-        <div>
-          <label for="{{ form.github_url.id_for_label }}" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">GitHub URL</label>
-          {{ form.github_url }}
-        </div>
+      <div>
+        <label for="{{ profile_form.education.id_for_label }}" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{{ profile_form.education.label }}</label>
+        {{ profile_form.education|add_class:"w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 dark:bg-gray-700 dark:text-gray-100" }}
+        {% if profile_form.education.errors %}
+          <p class="text-xs text-red-600 dark:text-red-400 mt-1">{{ profile_form.education.errors.0 }}</p>
+        {% endif %}
       </div>
 
-      <!-- Privacy Settings -->
-      <div class="space-y-4">
-        <h3 class="text-lg font-medium text-gray-900 dark:text-gray-100">Privacy Settings</h3>
-        <div>
-          <label for="{{ form.visibility.id_for_label }}" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Profile Visibility</label>
-          {{ form.visibility }}
+      <div>
+        <label for="{{ profile_form.experience.id_for_label }}" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{{ profile_form.experience.label }}</label>
+        {{ profile_form.experience|add_class:"w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 dark:bg-gray-700 dark:text-gray-100" }}
+        {% if profile_form.experience.errors %}
+          <p class="text-xs text-red-600 dark:text-red-400 mt-1">{{ profile_form.experience.errors.0 }}</p>
+        {% endif %}
+      </div>
+
+      <div>
+        <label for="{{ profile_form.portfolio_url.id_for_label }}" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{{ profile_form.portfolio_url.label }}</label>
+        {{ profile_form.portfolio_url|add_class:"w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 dark:bg-gray-700 dark:text-gray-100" }}
+        {% if profile_form.portfolio_url.errors %}
+          <p class="text-xs text-red-600 dark:text-red-400 mt-1">{{ profile_form.portfolio_url.errors.0 }}</p>
+        {% endif %}
+      </div>
+
+      <div>
+        <label for="{{ profile_form.linkedin_url.id_for_label }}" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{{ profile_form.linkedin_url.label }}</label>
+        {{ profile_form.linkedin_url|add_class:"w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 dark:bg-gray-700 dark:text-gray-100" }}
+        {% if profile_form.linkedin_url.errors %}
+          <p class="text-xs text-red-600 dark:text-red-400 mt-1">{{ profile_form.linkedin_url.errors.0 }}</p>
+        {% endif %}
+      </div>
+
+      <div>
+        <label for="{{ profile_form.github_url.id_for_label }}" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{{ profile_form.github_url.label }}</label>
+        {{ profile_form.github_url|add_class:"w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 dark:bg-gray-700 dark:text-gray-100" }}
+        {% if profile_form.github_url.errors %}
+          <p class="text-xs text-red-600 dark:text-red-400 mt-1">{{ profile_form.github_url.errors.0 }}</p>
+        {% endif %}
+      </div>
+
+      <div>
+        <label for="{{ profile_form.location_city.id_for_label }}" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{{ profile_form.location_city.label }}</label>
+        {{ profile_form.location_city|add_class:"w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 dark:bg-gray-700 dark:text-gray-100" }}
+        {% if profile_form.location_city.errors %}
+          <p class="text-xs text-red-600 dark:text-red-400 mt-1">{{ profile_form.location_city.errors.0 }}</p>
+        {% endif %}
+      </div>
+
+      <div>
+        <label for="{{ profile_form.location_state.id_for_label }}" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{{ profile_form.location_state.label }}</label>
+        {{ profile_form.location_state|add_class:"w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 dark:bg-gray-700 dark:text-gray-100" }}
+        {% if profile_form.location_state.errors %}
+          <p class="text-xs text-red-600 dark:text-red-400 mt-1">{{ profile_form.location_state.errors.0 }}</p>
+        {% endif %}
+      </div>
+
+      <div>
+        <label for="{{ profile_form.location_country.id_for_label }}" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{{ profile_form.location_country.label }}</label>
+        {{ profile_form.location_country|add_class:"w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 dark:bg-gray-700 dark:text-gray-100" }}
+        {% if profile_form.location_country.errors %}
+          <p class="text-xs text-red-600 dark:text-red-400 mt-1">{{ profile_form.location_country.errors.0 }}</p>
+        {% endif %}
+      </div>
+
+      <div>
+        <label for="{{ profile_form.commute_radius.id_for_label }}" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{{ profile_form.commute_radius.label }}</label>
+        {{ profile_form.commute_radius|add_class:"w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 dark:bg-gray-700 dark:text-gray-100" }}
+        {% if profile_form.commute_radius.errors %}
+          <p class="text-xs text-red-600 dark:text-red-400 mt-1">{{ profile_form.commute_radius.errors.0 }}</p>
+        {% endif %}
+      </div>
+
+      <div>
+        <label for="id_skills" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Skills</label>
+        <div class="mb-3">
+          {{ profile_form.skills }}
         </div>
-        <div class="flex items-center">
-          {{ form.show_email }}
-          <label for="{{ form.show_email.id_for_label }}" class="ml-2 text-sm text-gray-700 dark:text-gray-300">Show email on profile</label>
-        </div>
-        <div>
-          <label for="{{ form.account_type.id_for_label }}" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Account Type</label>
-          {{ form.account_type }}
-        </div>
+        {% if profile_form.skills.errors %}
+          <p class="text-xs text-red-600 dark:text-red-400 mt-1">{{ profile_form.skills.errors.0 }}</p>
+        {% endif %}
+        {% if profile_form.skills.help_text %}
+          <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">{{ profile_form.skills.help_text }}</p>
+        {% endif %}
+      </div>
+
+      <div>
+        <label for="{{ profile_form.other_skills.id_for_label }}" class="block mb-1 font-medium">Other Skills (comma-separated)</label>
+        {{ profile_form.other_skills|add_class:"w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 dark:bg-gray-700 dark:text-gray-100" }}
+        {% if profile_form.other_skills.errors %}
+          <p class="text-xs text-red-600 dark:text-red-400 mt-1">{{ profile_form.other_skills.errors.0 }}</p>
+        {% endif %}
+        {% if profile_form.other_skills.help_text %}
+          <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">{{ profile_form.other_skills.help_text }}</p>
+        {% endif %}
+      </div>
+
+      <div>
+        <label for="{{ profile_form.visibility.id_for_label }}" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{{ profile_form.visibility.label }}</label>
+        {{ profile_form.visibility|add_class:"w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 dark:bg-gray-700 dark:text-gray-100" }}
+        {% if profile_form.visibility.errors %}
+          <p class="text-xs text-red-600 dark:text-red-400 mt-1">{{ profile_form.visibility.errors.0 }}</p>
+        {% endif %}
+        {% if profile_form.visibility.help_text %}
+          <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">{{ profile_form.visibility.help_text }}</p>
+        {% endif %}
+      </div>
+
+      <div class="flex items-center gap-2">
+        {{ profile_form.show_email }}
+        <label for="{{ profile_form.show_email.id_for_label }}" class="text-sm font-medium text-gray-700 dark:text-gray-300">{{ profile_form.show_email.label }}</label>
+        {% if profile_form.show_email.errors %}
+          <p class="text-xs text-red-600 dark:text-red-400 mt-1">{{ profile_form.show_email.errors.0 }}</p>
+        {% endif %}
+      </div>
+
+      <div>
+        <label for="{{ profile_form.account_type.id_for_label }}" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{{ profile_form.account_type.label }}</label>
+        {{ profile_form.account_type|add_class:"w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 dark:bg-gray-700 dark:text-gray-100" }}
+        {% if profile_form.account_type.errors %}
+          <p class="text-xs text-red-600 dark:text-red-400 mt-1">{{ profile_form.account_type.errors.0 }}</p>
+        {% endif %}
       </div>
 
       <button type="submit" class="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-500">Save</button>
@@ -118,6 +174,49 @@
     </ul>
   </aside>
 </div>
+{% endblock %}
+
+{% block extra_scripts %}
+{{ block.super }}
+<!-- Select2 CSS -->
+<link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+<!-- jQuery (required by Select2) -->
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
+<!-- Select2 JS -->
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+<script>
+  $(document).ready(function() {
+    $('.select2-skills').select2({
+      placeholder: "Select skills",
+      allowClear: true,
+      tags: true, // Allows creation of new tags
+      tokenSeparators: [',', ' ']
+    });
+
+    // Integrate with the "Other Skills" field if it exists
+    const otherSkillsInput = document.getElementById('id_other_skills');
+    if (otherSkillsInput) {
+      otherSkillsInput.addEventListener('change', function() {
+        const newSkills = this.value.split(',').map(s => s.trim()).filter(s => s.length > 0);
+        const $select2Skills = $('.select2-skills');
+        let currentSkills = $select2Skills.val() || [];
+
+        newSkills.forEach(function(skillName) {
+          if (currentSkills.indexOf(skillName) === -1) {
+            // Add new skill to Select2 if it's not already there
+            if ($select2Skills.find('option:contains("' + skillName + '")').length === 0) {
+              var newOption = new Option(skillName, skillName, true, true);
+              $select2Skills.append(newOption).trigger('change');
+            }
+            currentSkills.push(skillName);
+          }
+        });
+        // Update Select2's selected values (this handles both existing and new tags)
+        $select2Skills.val(currentSkills).trigger('change');
+      });
+    }
+  });
+</script>
 {% endblock %}
 
 
