@@ -30,6 +30,8 @@ class JobForm(forms.ModelForm):
             "location_city",
             "location_state",
             "location_country",
+            "latitude",
+            "longitude",
             "min_salary",
             "max_salary",
             "work_type",
@@ -37,6 +39,8 @@ class JobForm(forms.ModelForm):
         ]
         widgets = {
             "description": forms.Textarea(attrs={'rows': 4}),
+            "latitude": forms.HiddenInput(),
+            "longitude": forms.HiddenInput(),
         }
     
     def save(self, commit=True):
