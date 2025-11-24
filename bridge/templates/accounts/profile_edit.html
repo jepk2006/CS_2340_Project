@@ -78,6 +78,12 @@
         {% endif %}
       </div>
 
+      <div class="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-md p-4 mb-4">
+        <p class="text-sm text-blue-800 dark:text-blue-200">
+          <strong>📍 Location Info:</strong> Enter your location and it will automatically appear on the applicant map for recruiters to see.
+        </p>
+      </div>
+
       <div>
         <label for="{{ profile_form.location_city.id_for_label }}" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{{ profile_form.location_city.label }}</label>
         {{ profile_form.location_city }}

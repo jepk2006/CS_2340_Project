@@ -17,6 +17,7 @@ from .models import Job, Skill, Application
 from django.views.decorators.http import require_POST
 from accounts.models import JobSeekerProfile
 from .decorators import admin_required
+from .forms import JobForm
 
 
 def calculate_distance(lat1, lon1, lat2, lon2):
@@ -299,26 +300,6 @@ def job_map_data(request):
     )
 
 # ===== JOB POSTING FORMS AND VIEWS =====
-
-class JobForm(forms.ModelForm):
-    """Form for creating and editing job postings"""
-    class Meta:
-        model = Job
-        fields = [
-            'title', 'company', 'description', 'skills',
-            'location_city', 'location_state', 'location_country',
-            'latitude', 'longitude',
-            'min_salary', 'max_salary', 'work_type', 'visa_sponsorship'
-        ]
-        widgets = {
-            'description': forms.Textarea(attrs={'rows': 6}),
-            'skills': forms.CheckboxSelectMultiple(),
-        }
-        help_texts = {
-            'latitude': 'Optional: Decimal degrees (e.g., 33.7490 for Atlanta)',
-            'longitude': 'Optional: Decimal degrees (e.g., -84.3880 for Atlanta)',
-        }
-
 
 class RecruiterRequiredMixin(LoginRequiredMixin, UserPassesTestMixin):
     """Mixin to ensure user is authenticated and is a recruiter"""

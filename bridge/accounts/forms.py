@@ -2,6 +2,10 @@ from django import forms
 from .models import SavedSearch, JobSeekerProfile, Message
 from jobs.models import Skill
 from django.contrib.auth import get_user_model # Restored get_user_model
+import urllib.request
+import urllib.parse
+import json
+import time
 
 
 class SavedSearchForm(forms.ModelForm):
@@ -48,8 +52,7 @@ class JobSeekerProfileForm(forms.ModelForm):
             "location_city",
             "location_state",
             "location_country",
-            "latitude",
-            "longitude",
+            # latitude and longitude are auto-populated via geocoding
             "commute_radius",
             "skills",
             "visibility",
@@ -68,11 +71,9 @@ class JobSeekerProfileForm(forms.ModelForm):
             'portfolio_url': forms.URLInput(attrs={'class': _input_class, 'placeholder': 'https://yourportfolio.com'}),
             'linkedin_url': forms.URLInput(attrs={'class': _input_class, 'placeholder': 'https://linkedin.com/in/yourprofile'}),
             'github_url': forms.URLInput(attrs={'class': _input_class, 'placeholder': 'https://github.com/yourusername'}),
-            'location_city': forms.TextInput(attrs={'class': _input_class, 'placeholder': 'City'}),
-            'location_state': forms.TextInput(attrs={'class': _input_class, 'placeholder': 'State/Province'}),
-            'location_country': forms.TextInput(attrs={'class': _input_class, 'placeholder': 'Country'}),
-            'latitude': forms.NumberInput(attrs={'class': _input_class, 'step': '0.000001'}),
-            'longitude': forms.NumberInput(attrs={'class': _input_class, 'step': '0.000001'}),
+            'location_city': forms.TextInput(attrs={'class': _input_class, 'placeholder': 'e.g., Atlanta'}),
+            'location_state': forms.TextInput(attrs={'class': _input_class, 'placeholder': 'e.g., GA or Georgia'}),
+            'location_country': forms.TextInput(attrs={'class': _input_class, 'placeholder': 'e.g., USA or United States'}),
             'commute_radius': forms.NumberInput(attrs={'class': _input_class, 'placeholder': 'Miles'}),
             'visibility': forms.Select(attrs={'class': _select_class}),
             'show_email': forms.CheckboxInput(attrs={'class': 'rounded border-gray-300 text-indigo-600 focus:ring-indigo-500'}),
@@ -93,8 +94,65 @@ class JobSeekerProfileForm(forms.ModelForm):
         help_text="Comma-separated new skills not in the list"
     )
 
+    def geocode_location(self, city, state, country):
+        """Convert location text to latitude/longitude using Nominatim (OpenStreetMap)"""
+        try:
+            # Build location query
+            location_parts = [p for p in [city, state, country] if p]
+            if not location_parts:
+                return None, None
+            
+            location_query = ', '.join(location_parts)
+            
+            # Use Nominatim API (free, no API key required)
+            base_url = 'https://nominatim.openstreetmap.org/search'
+            params = {
+                'q': location_query,
+                'format': 'json',
+                'limit': 1
+            }
+            
+            url = f"{base_url}?{urllib.parse.urlencode(params)}"
+            
+            # Add user agent (required by Nominatim)
+            req = urllib.request.Request(url, headers={'User-Agent': 'JobBridge/1.0'})
+            
+            with urllib.request.urlopen(req, timeout=5) as response:
+                data = json.loads(response.read().decode())
+                
+                if data and len(data) > 0:
+                    lat = float(data[0]['lat'])
+                    lon = float(data[0]['lon'])
+                    return lat, lon
+                    
+            return None, None
+            
+        except Exception as e:
+            # If geocoding fails, just return None and don't block the save
+            print(f"Geocoding error: {e}")
+            return None, None
+
     def save(self, commit=True):
         instance = super().save(commit=False)
+        
+        # Auto-geocode location if city/state/country are provided
+        city = self.cleaned_data.get('location_city', '').strip()
+        state = self.cleaned_data.get('location_state', '').strip()
+        country = self.cleaned_data.get('location_country', '').strip()
+        
+        # Only geocode if location fields are provided and lat/lon are not manually set
+        if (city or state or country):
+            # Check if lat/lon were manually changed in the form
+            lat_changed = 'latitude' in self.changed_data
+            lon_changed = 'longitude' in self.changed_data
+            
+            # Only auto-geocode if lat/lon weren't manually set
+            if not (lat_changed or lon_changed):
+                lat, lon = self.geocode_location(city, state, country)
+                if lat is not None and lon is not None:
+                    instance.latitude = lat
+                    instance.longitude = lon
+        
         if commit:
             instance.save()
         
