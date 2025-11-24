@@ -337,6 +337,9 @@ class JobUpdateView(RecruiterRequiredMixin, UpdateView):
         if not super().test_func():
             return False
         job = self.get_object()
+        # Prevent editing removed jobs
+        if job.moderation_status == Job.ModerationStatus.REMOVED:
+            return False
         return job.posted_by == self.request.user
     
     def get_success_url(self):
@@ -362,7 +365,12 @@ class MyJobsListView(RecruiterRequiredMixin, ListView):
     paginate_by = 10
     
     def get_queryset(self):
-        return Job.objects.filter(posted_by=self.request.user).order_by('-created_at')
+        # Exclude removed jobs - recruiters should not see jobs removed by admin
+        return Job.objects.filter(
+            posted_by=self.request.user
+        ).exclude(
+            moderation_status=Job.ModerationStatus.REMOVED
+        ).order_by('-created_at')
     
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
