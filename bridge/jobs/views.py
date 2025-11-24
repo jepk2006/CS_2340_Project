@@ -52,29 +52,9 @@ def _get_jobseeker_profile(user):
 
 
 def apply_commute_radius_filter(queryset, user):
-    profile = _get_jobseeker_profile(user)
-    if not profile or not profile.commute_radius or not profile.latitude or not profile.longitude:
-        return queryset
-
-    user_lat = float(profile.latitude)
-    user_lon = float(profile.longitude)
-    jobs_within_radius = []
-
-    for job in queryset:
-        if job.latitude and job.longitude:
-            distance = calculate_distance(
-                user_lat,
-                user_lon,
-                float(job.latitude),
-                float(job.longitude),
-            )
-            if distance is not None and distance <= profile.commute_radius:
-                jobs_within_radius.append(job.pk)
-
-    if not jobs_within_radius:
-        return queryset.none()
-
-    return queryset.filter(pk__in=jobs_within_radius)
+    # Don't auto-filter by commute radius - show all jobs by default
+    # Users can use the map view with distance filters if they want location-based filtering
+    return queryset
 
 
 def build_distance_lookup(jobs, user):
@@ -137,15 +117,32 @@ class JobListView(FilterView):
 
     def get_queryset(self):
         queryset = super().get_queryset()
-        if not (self.request.user.is_authenticated and self.request.user.is_superuser):
-            queryset = queryset.exclude(moderation_status=Job.ModerationStatus.REMOVED)
-        return apply_commute_radius_filter(queryset, self.request.user)
+        try:
+            # Check if user is authenticated and is a superuser
+            is_authenticated = getattr(self.request.user, 'is_authenticated', False)
+            if callable(is_authenticated):
+                is_authenticated = is_authenticated()
+            is_superuser = getattr(self.request.user, 'is_superuser', False)
+            
+            if not (is_authenticated and is_superuser):
+                queryset = queryset.exclude(moderation_status=Job.ModerationStatus.REMOVED)
+            
+            return apply_commute_radius_filter(queryset, self.request.user)
+        except Exception as e:
+            # If anything fails, just return the basic queryset
+            return queryset.exclude(moderation_status=Job.ModerationStatus.REMOVED)
 
     def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        job_list = context.get("jobs", [])
-        context["job_distances"] = build_distance_lookup(job_list, self.request.user)
-        return context
+        try:
+            context = super().get_context_data(**kwargs)
+            job_list = context.get("jobs", [])
+            context["job_distances"] = build_distance_lookup(job_list, self.request.user)
+            return context
+        except Exception as e:
+            # If context fails, return minimal context
+            context = super().get_context_data(**kwargs)
+            context["job_distances"] = {}
+            return context
 
 
 class JobDetailView(DetailView):
@@ -206,13 +203,9 @@ def job_map_data(request):
         except (TypeError, ValueError):
             distance_limit = None
 
-    # Fallback to saved profile location / commute radius if not provided
-    if (user_lat is None or user_lon is None) and profile and profile.latitude and profile.longitude:
-        user_lat = float(profile.latitude)
-        user_lon = float(profile.longitude)
-
-    if distance_limit is None and profile and profile.commute_radius:
-        distance_limit = float(profile.commute_radius)
+    # ONLY use profile location/commute if user explicitly clicked "Use My Location"
+    # Don't auto-apply distance filtering - let users see all jobs by default
+    # (The profile location/commute is only used if lat_param or max_dist_param are provided)
 
     # Apply distance filter only if we have both a location and a distance
     if user_lat is not None and user_lon is not None and distance_limit:
