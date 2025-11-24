@@ -41,8 +41,9 @@ class JobForm(forms.ModelForm):
     
     def save(self, commit=True):
         instance = super().save(commit=False)
-        if commit:
-            instance.save()
+        
+        # ALWAYS save the instance first before setting M2M relationships
+        instance.save()
         
         # Collect existing skills from the ModelMultipleChoiceField
         selected_skills_objects = list(self.cleaned_data.get('skills', []))
@@ -59,7 +60,8 @@ class JobForm(forms.ModelForm):
                 skill, _ = Skill.objects.get_or_create(name__iexact=normalized_skill_name, defaults={'name': normalized_skill_name})
                 all_skills_to_add.add(skill)
 
-        instance.skills.set(list(all_skills_to_add))  # Convert set back to list for .set()
+        # Set skills after instance is saved (M2M requires saved instance)
+        instance.skills.set(list(all_skills_to_add))
 
         return instance
 
