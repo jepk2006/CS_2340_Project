@@ -15,11 +15,17 @@
     <h2 class="text-lg font-semibold mb-4">Filters</h2>
     
     {% if user.is_authenticated and user.jobseeker_profile.commute_radius %}
-    <div class="mb-4 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+    <div id="commuteWarning" class="mb-4 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
       <div class="flex items-center justify-between">
         <div>
-          <p class="text-sm font-medium text-blue-900 dark:text-blue-100">Commute Filter Active</p>
-          <p class="text-xs text-blue-700 dark:text-blue-300">Showing jobs within {{ user.jobseeker_profile.commute_radius }} miles</p>
+          <p class="text-sm font-medium text-blue-900 dark:text-blue-100">
+            <span id="commuteWarningTitle">List View: Commute Filter Active</span>
+          </p>
+          <p id="commuteWarningText" class="text-xs text-blue-700 dark:text-blue-300">
+            Jobs in list view are filtered to {{ user.jobseeker_profile.commute_radius }} miles from your saved location.
+            <br>
+            <span class="italic">In map view, click "Use My Location" to apply distance filtering.</span>
+          </p>
         </div>
         <a href="{% url 'accounts:profile_edit' %}" class="text-xs text-blue-600 dark:text-blue-400 hover:underline">Edit</a>
       </div>
@@ -161,11 +167,14 @@
       <div class="mb-3 flex flex-col md:flex-row md:items-center gap-2">
         <div class="flex items-center gap-2">
           <label for="distanceMilesInput" class="text-sm">Max distance (miles)</label>
-          <input id="distanceMilesInput" type="number" min="1" step="1" placeholder="e.g. 25" class="w-24" />
+          <input id="distanceMilesInput" type="number" min="1" step="1" placeholder="e.g. 25" 
+                 {% if user.is_authenticated and user.jobseeker_profile.commute_radius %}value="{{ user.jobseeker_profile.commute_radius }}"{% endif %}
+                 class="w-24" />
         </div>
         <div class="flex items-center gap-2">
-          <button id="useLocationBtn" type="button" class="px-3 py-1.5 rounded border border-gray-300 dark:border-gray-700">Use My Location</button>
-          <button id="applyDistanceBtn" type="button" class="px-3 py-1.5 rounded bg-indigo-600 text-white">Apply Distance</button>
+          <button id="useLocationBtn" type="button" class="px-3 py-1.5 rounded border border-gray-300 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700">Use My Location</button>
+          <button id="applyDistanceBtn" type="button" class="px-3 py-1.5 rounded bg-indigo-600 hover:bg-indigo-500 text-white">Apply Distance</button>
+          <button id="clearFilterBtn" type="button" class="px-3 py-1.5 rounded border border-red-300 dark:border-red-700 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20">Clear Filter</button>
         </div>
       </div>
       <div id="jobMap" class="h-96 rounded-xl overflow-hidden border border-gray-200 dark:border-gray-800"></div>
@@ -207,6 +216,7 @@
       const mapElement = document.getElementById('jobMap');
       let mapInstance = null;
       let markersLayer = null;
+      let distanceCircle = null;
       let hasLoaded = false;
       let userLat = null;
       let userLon = null;
@@ -215,6 +225,7 @@
       const distanceInput = document.getElementById('distanceMilesInput');
       const useLocationBtn = document.getElementById('useLocationBtn');
       const applyDistanceBtn = document.getElementById('applyDistanceBtn');
+      const clearFilterBtn = document.getElementById('clearFilterBtn');
 
       if (!listToggle || !mapToggle || !jobListSection || !mapContainer) {
         return;
@@ -230,12 +241,29 @@
         });
       }
 
+      function updateCommuteWarning(view) {
+        const warningElement = document.getElementById('commuteWarning');
+        const warningTitle = document.getElementById('commuteWarningTitle');
+        const warningText = document.getElementById('commuteWarningText');
+        
+        if (!warningElement || !warningTitle || !warningText) return;
+        
+        if (view === 'list') {
+          warningTitle.textContent = 'List View: Commute Filter Active';
+          warningText.innerHTML = 'Jobs in list view are filtered to {{ user.jobseeker_profile.commute_radius }} miles from your saved location.<br><span class="italic">In map view, click "Use My Location" to apply distance filtering.</span>';
+        } else if (view === 'map') {
+          warningTitle.textContent = 'Map View: Distance Filter Available';
+          warningText.innerHTML = 'Your preferred commute radius ({{ user.jobseeker_profile.commute_radius }} miles) is saved.<br><span class="italic">Click "Use My Location" below to apply it to the map.</span>';
+        }
+      }
+
       function showListView() {
         setActiveButton(listToggle);
         jobListSection.classList.remove('hidden');
         mapContainer.classList.add('hidden');
         paginationControls?.classList.remove('hidden');
         mapStatus.classList.add('hidden');
+        updateCommuteWarning('list');
       }
 
       function showMapView() {
@@ -243,6 +271,7 @@
         jobListSection.classList.add('hidden');
         mapContainer.classList.remove('hidden');
         paginationControls?.classList.add('hidden');
+        updateCommuteWarning('map');
         if (!hasLoaded) {
           initializeMap();
         } else if (mapInstance) {
@@ -319,6 +348,25 @@
               }).bindPopup('Your location');
               userMarker.addTo(markersLayer);
               bounds.push([data.user_location.latitude, data.user_location.longitude]);
+              
+              // Draw distance circle if filter is active
+              const raw = distanceInput?.value || '';
+              const miles = raw ? parseFloat(raw) : distanceMiles;
+              if (miles && !Number.isNaN(miles) && miles > 0) {
+                // Remove old circle if exists
+                if (distanceCircle) {
+                  distanceCircle.remove();
+                }
+                // Convert miles to meters (1 mile = 1609.34 meters)
+                const radiusMeters = miles * 1609.34;
+                distanceCircle = L.circle([data.user_location.latitude, data.user_location.longitude], {
+                  color: '#4f46e5',
+                  fillColor: '#818cf8',
+                  fillOpacity: 0.1,
+                  weight: 2,
+                  radius: radiusMeters
+                }).addTo(markersLayer);
+              }
             }
 
             if (bounds.length) {
@@ -394,6 +442,25 @@
               }).bindPopup('Your location');
               userMarker.addTo(markersLayer);
               bounds.push([data.user_location.latitude, data.user_location.longitude]);
+              
+              // Draw distance circle if filter is active
+              const raw = distanceInput?.value || '';
+              const miles = raw ? parseFloat(raw) : distanceMiles;
+              if (miles && !Number.isNaN(miles) && miles > 0) {
+                // Remove old circle if exists
+                if (distanceCircle) {
+                  distanceCircle.remove();
+                }
+                // Convert miles to meters (1 mile = 1609.34 meters)
+                const radiusMeters = miles * 1609.34;
+                distanceCircle = L.circle([data.user_location.latitude, data.user_location.longitude], {
+                  color: '#4f46e5',
+                  fillColor: '#818cf8',
+                  fillOpacity: 0.1,
+                  weight: 2,
+                  radius: radiusMeters
+                }).addTo(markersLayer);
+              }
             }
 
             if (bounds.length) {
@@ -435,18 +502,46 @@
             mapStatus.classList.remove('hidden');
             return;
           }
+          
+          // Show loading state
+          useLocationBtn.disabled = true;
+          useLocationBtn.textContent = 'Getting location...';
+          mapStatus.textContent = 'Getting your location...';
+          mapStatus.classList.remove('hidden');
+          
           navigator.geolocation.getCurrentPosition(
             (pos) => {
               userLat = pos.coords.latitude;
               userLon = pos.coords.longitude;
-              mapStatus.textContent = 'Location set.';
+              
+              // Get the distance value from input
+              const raw = distanceInput?.value || '';
+              const miles = raw ? parseFloat(raw) : null;
+              distanceMiles = miles && !Number.isNaN(miles) && miles > 0 ? miles : null;
+              
+              // Automatically apply the distance filter
+              if (distanceMiles) {
+                mapStatus.textContent = `Showing jobs within ${distanceMiles} miles of your location.`;
+              } else {
+                mapStatus.textContent = 'Location set. Enter a distance and click "Apply Distance" to filter.';
+              }
               mapStatus.classList.remove('hidden');
+              
+              // Reset button state
+              useLocationBtn.disabled = false;
+              useLocationBtn.textContent = 'Use My Location';
+              
+              // Update the map with the distance filter
               updateMapData();
             },
             (err) => {
               console.error(err);
               mapStatus.textContent = 'Could not get your location. Please allow access and try again.';
               mapStatus.classList.remove('hidden');
+              
+              // Reset button state
+              useLocationBtn.disabled = false;
+              useLocationBtn.textContent = 'Use My Location';
             },
             { enableHighAccuracy: true, timeout: 8000 }
           );
@@ -458,6 +553,28 @@
           const raw = distanceInput?.value || '';
           const miles = raw ? parseFloat(raw) : null;
           distanceMiles = miles && !Number.isNaN(miles) && miles > 0 ? miles : null;
+          updateMapData();
+        });
+      }
+
+      if (clearFilterBtn) {
+        clearFilterBtn.addEventListener('click', () => {
+          // Clear user location and distance filter
+          userLat = null;
+          userLon = null;
+          distanceMiles = null;
+          
+          // Remove distance circle from map
+          if (distanceCircle) {
+            distanceCircle.remove();
+            distanceCircle = null;
+          }
+          
+          // Clear status message
+          mapStatus.textContent = '';
+          mapStatus.classList.add('hidden');
+          
+          // Reload map without filters
           updateMapData();
         });
       }
