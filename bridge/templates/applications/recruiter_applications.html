@@ -239,6 +239,12 @@
     {% endfor %}
   </div>
 
+  <!-- Applicant Map -->
+  <div class="bg-white dark:bg-gray-800 rounded-lg shadow-md p-4 mt-6 border border-gray-200 dark:border-gray-700">
+    <h2 class="text-xl font-semibold mb-4 text-gray-900 dark:text-white">Applicant Locations</h2>
+    <div id="applicantMap" style="height: 500px; width: 100%; border-radius: 0.5rem;"></div>
+  </div>
+
 </div>
 
 <style>
@@ -289,4 +295,138 @@
 </style>
  
 <!-- Email modal removed: using mailto links instead -->
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+(function() {
+    'use strict';
+    
+    function initializeMap() {
+        const mapContainer = document.getElementById('applicantMap');
+        
+        if (!mapContainer) {
+            console.error('Map container not found');
+            return;
+        }
+        
+        // Check if container has dimensions
+        const rect = mapContainer.getBoundingClientRect();
+        console.log('Map container dimensions:', rect.width, 'x', rect.height);
+        
+        if (rect.width === 0 || rect.height === 0) {
+            console.error('Map container has no dimensions');
+            return;
+        }
+        
+        // Remove any existing map instance
+        if (mapContainer._leaflet_id) {
+            mapContainer._leaflet_id = null;
+            mapContainer.innerHTML = '';
+        }
+        
+        console.log("Initializing map...");
+        
+        // Initialize the map with preferCanvas option for better performance
+        const map = L.map('applicantMap', {
+            preferCanvas: true,
+            scrollWheelZoom: true
+        }).setView([39.8283, -98.5795], 4); // Center on USA
+
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+            maxZoom: 18,
+            minZoom: 2
+        }).addTo(map);
+        
+        const markers = L.markerClusterGroup({
+            chunkedLoading: true,
+            spiderfyOnMaxZoom: true,
+            showCoverageOnHover: false
+        });
+
+        // Critical: Force map to recognize its container size immediately
+        map.invalidateSize(true);
+        console.log("Map initialized and size set");
+
+        function fetchAndDisplayApplicants() {
+            const params = new URLSearchParams(window.location.search);
+            const query = params.get('search') || '';
+            const job_id = params.get('job') || '';
+            const status = params.get('status') || '';
+            const priority = params.get('priority') || '';
+            const flagged_only = params.get('flagged_only') === 'on' ? 'true' : '';
+
+            const apiUrl = `{% url 'accounts:applicant_map_data_api' %}?search=${query}&job_id=${job_id}&status=${status}&priority=${priority}&flagged_only=${flagged_only}`;
+            console.log("Fetching map data from:", apiUrl);
+
+            fetch(apiUrl)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    console.log("Map data received:", data);
+                    markers.clearLayers();
+                    
+                    if (data.results.length === 0) {
+                        console.log("No applicants with location data found");
+                        return;
+                    }
+                    
+                    data.results.forEach(applicant => {
+                        if (applicant.latitude && applicant.longitude) {
+                            console.log("Adding marker for:", applicant.username, applicant.latitude, applicant.longitude);
+                            const marker = L.marker([applicant.latitude, applicant.longitude]);
+                            marker.bindPopup(`
+                                <div class="p-2">
+                                    <b class="text-lg">${applicant.username}</b><br>
+                                    <span class="text-sm text-gray-600">${applicant.headline || 'No headline'}</span><br>
+                                    <a href="${applicant.detail_url}" class="text-indigo-600 hover:underline text-sm">View Profile →</a>
+                                </div>
+                            `);
+                            markers.addLayer(marker);
+                        }
+                    });
+                    
+                    map.addLayer(markers);
+                    
+                    // Fit map to show all markers
+                    if (data.results.length > 0) {
+                        const bounds = markers.getBounds();
+                        if (bounds.isValid()) {
+                            map.fitBounds(bounds, { 
+                                padding: [50, 50],
+                                maxZoom: 12
+                            });
+                        }
+                    }
+                    
+                    // Final size check
+                    map.invalidateSize(true);
+                })
+                .catch(error => console.error('Error fetching applicant map data:', error));
+        }
+
+        // Fetch applicants
+        fetchAndDisplayApplicants();
+        
+        // Handle window resize
+        window.addEventListener('resize', function() {
+            map.invalidateSize(true);
+        });
+    }
+    
+    // Try multiple initialization strategies
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', function() {
+            setTimeout(initializeMap, 100);
+        });
+    } else {
+        setTimeout(initializeMap, 100);
+    }
+})();
+</script>
 {% endblock %}

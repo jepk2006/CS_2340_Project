@@ -69,6 +69,7 @@ class SavedSearch(models.Model):
     # Search criteria fields
     query = models.TextField(blank=True, help_text="Keywords search")
     skills = models.ManyToManyField(Skill, blank=True, related_name="saved_searches")
+    other_skills = models.TextField(blank=True, help_text="Comma-separated other skills entered by recruiter") # Added for raw skill input
     location_city = models.CharField(max_length=100, blank=True)
     location_state = models.CharField(max_length=100, blank=True)
     location_country = models.CharField(max_length=100, blank=True)
@@ -128,11 +129,19 @@ class SavedSearch(models.Model):
         return profiles
     
     def get_new_matches_since_last_check(self):
-        """Get profiles that match and have been updated since last check"""
+        """Get profiles that match this saved search and were created/updated since last check."""
         profiles = self.get_matching_profiles()
         
-        if self.last_check:
-            profiles = profiles.filter(updated_at__gt=self.last_check)
+        # If we've never checked, all matches are "new"
+        if not self.last_check:
+            return profiles
+        
+        # Only show profiles that were created or updated AFTER the last check
+        # This ensures the count goes to 0 after viewing matches
+        profiles = profiles.filter(
+            models.Q(user__date_joined__gt=self.last_check) |
+            models.Q(updated_at__gt=self.last_check)
+        )
         
         return profiles
     

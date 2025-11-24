@@ -21,61 +21,51 @@
 
   {% if page_obj.object_list %}
     <div class="space-y-4">
-      {% for message in page_obj.object_list %}
-        <div class="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-800 rounded-xl p-5 {% if not message.is_read %}border-l-4 border-l-indigo-500{% endif %}">
+      {% for profile in page_obj.object_list %}
+        <div class="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-800 rounded-xl p-5">
           <div class="flex items-start justify-between">
             <div class="flex-1">
-              <div class="flex items-center gap-3 mb-2">
-                <h3 class="font-semibold text-lg">{{ message.title }}</h3>
-                {% if not message.is_read %}
-                  <span class="text-xs bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 px-2 py-1 rounded-full">
-                    New
-                  </span>
-                {% endif %}
-                <span class="text-xs bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 px-2 py-1 rounded-full">
-                  {{ message.get_message_type_display }}
-                </span>
-              </div>
-              
-              <div class="text-sm text-gray-600 dark:text-gray-300 mb-3">
-                {{ message.content }}
-              </div>
-              
-              <!-- Candidate Information -->
-              <div class="bg-gray-50 dark:bg-gray-700 rounded-lg p-4 mb-3">
+              <!-- Candidate Information (displayed once per unique profile) -->
+              <div class="mb-4 pb-4 border-b border-gray-200 dark:border-gray-700">
                 <div class="flex items-center justify-between mb-2">
-                  <div class="font-medium">{{ message.profile.user.username }}</div>
+                  <a href="{% url 'accounts:profile_detail_pk' profile.pk %}" class="font-semibold text-lg text-indigo-600 dark:text-indigo-400 hover:underline">
+                    {{ profile.user.username }}
+                  </a>
                   <div class="text-xs text-gray-500">
-                    {{ message.profile.location_city }}{% if message.profile.location_state %}, {{ message.profile.location_state }}{% endif %}
+                    {{ profile.location_city }}{% if profile.location_state %}, {{ profile.location_state }}{% endif %}
                   </div>
                 </div>
-                
-                {% if message.profile.headline %}
-                  <div class="text-sm text-gray-600 dark:text-gray-300 mb-2">{{ message.profile.headline }}</div>
+                {% if profile.headline %}
+                  <div class="text-sm text-gray-600 dark:text-gray-300 mb-2">{{ profile.headline }}</div>
                 {% endif %}
-                
-                {% if message.profile.bio %}
-                  <p class="text-sm text-gray-600 dark:text-gray-300 mb-3 line-clamp-2">{{ message.profile.bio }}</p>
+                {% if profile.bio %}
+                  <p class="text-sm text-gray-600 dark:text-gray-300 mb-3 line-clamp-2">{{ profile.bio }}</p>
                 {% endif %}
-                
-                {% if message.profile.skills.all %}
+                {% if profile.skills.all %}
                   <div class="flex flex-wrap gap-1">
-                    {% for skill in message.profile.skills.all|slice:":6" %}
+                    {% for skill in profile.skills.all|slice:":6" %}
                       <span class="text-xs px-2 py-0.5 rounded-full bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300">
                         {{ skill.name }}
                       </span>
                     {% endfor %}
-                    {% if message.profile.skills.count > 6 %}
-                      <span class="text-xs text-gray-500">+{{ message.profile.skills.count|add:"-6" }} more</span>
+                    {% if profile.skills.count > 6 %}
+                      <span class="text-xs text-gray-500">+{{ profile.skills.count|add:"-6" }} more</span>
                     {% endif %}
                   </div>
                 {% endif %}
               </div>
-              
-              <!-- Search Information -->
-              <div class="flex items-center gap-4 text-sm text-gray-500 dark:text-gray-400">
-                <span>📋 From search: <strong>{{ message.saved_search.name }}</strong></span>
-                <span>📅 {{ message.created_at|date:"M d, Y H:i" }}</span>
+
+              <!-- Associated New Match Messages for this candidate -->
+              <div class="space-y-3">
+                {% for message in profile.new_match_messages %}
+                  <div class="bg-gray-50 dark:bg-gray-700 rounded-lg p-3 {% if not message.is_read %}border-l-4 border-l-green-500{% endif %}">
+                    <div class="flex items-center justify-between mb-1">
+                      <h4 class="font-medium text-sm">New Match from: <strong>{{ message.saved_search.name }}</strong></h4>
+                      <span class="text-xs text-gray-500">{{ message.created_at|date:"M d, Y H:i" }}</span>
+                    </div>
+                    <p class="text-sm text-gray-600 dark:text-gray-300">{{ message.content }}</p>
+                  </div>
+                {% endfor %}
               </div>
             </div>
           </div>
@@ -132,7 +122,15 @@
   {% endif %}
 </div>
 
+{% block extra_scripts %}
 <script>
+// Update badge immediately on page load
+document.addEventListener('DOMContentLoaded', function() {
+  if (typeof setUnreadBadgeCount === 'function') {
+    setUnreadBadgeCount({{ unread_count }});
+  }
+});
+
 function checkNewMatches() {
   const btn = document.getElementById('checkMatchesBtn');
   const originalText = btn.innerHTML;
@@ -170,15 +168,7 @@ function checkNewMatches() {
   });
 }
 
-// Add CSRF token for AJAX requests
-document.addEventListener('DOMContentLoaded', function() {
-  if (!document.querySelector('[name=csrfmiddlewaretoken]')) {
-    const csrfToken = document.createElement('input');
-    csrfToken.type = 'hidden';
-    csrfToken.name = 'csrfmiddlewaretoken';
-    csrfToken.value = '{{ csrf_token }}';
-    document.body.appendChild(csrfToken);
-  }
-});
+// The global CSRF token setup is already in base.html now.
 </script>
+{% endblock %}
 {% endblock %}

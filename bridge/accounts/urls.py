@@ -37,6 +37,7 @@ urlpatterns = [
     path("admin/export/conversations/", views.export_conversations, name="admin_export_conversations"),
     path("admin/export/messages/", views.export_messages, name="admin_export_messages"),
     path("admin/export/saved-searches/", views.export_saved_searches, name="admin_export_saved_searches"),
+    path("api/applicant-map-data/", views.applicant_map_data_api, name="applicant_map_data_api"), # New API for applicant map data
 ]
 
 

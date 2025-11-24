@@ -56,6 +56,28 @@ class JobSeekerProfileForm(forms.ModelForm):
             "show_email",
             "account_type",
         ]
+        _input_class = 'w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 dark:bg-gray-700 dark:text-gray-100'
+        _textarea_class = 'w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 dark:bg-gray-700 dark:text-gray-100'
+        _select_class = 'w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 dark:bg-gray-700 dark:text-gray-100'
+        
+        widgets = {
+            'headline': forms.TextInput(attrs={'class': _input_class, 'placeholder': 'e.g., Senior Software Engineer'}),
+            'bio': forms.Textarea(attrs={'class': _textarea_class, 'rows': 4, 'placeholder': 'Tell us about yourself...'}),
+            'education': forms.Textarea(attrs={'class': _textarea_class, 'rows': 3, 'placeholder': 'Your education background...'}),
+            'experience': forms.Textarea(attrs={'class': _textarea_class, 'rows': 4, 'placeholder': 'Your work experience...'}),
+            'portfolio_url': forms.URLInput(attrs={'class': _input_class, 'placeholder': 'https://yourportfolio.com'}),
+            'linkedin_url': forms.URLInput(attrs={'class': _input_class, 'placeholder': 'https://linkedin.com/in/yourprofile'}),
+            'github_url': forms.URLInput(attrs={'class': _input_class, 'placeholder': 'https://github.com/yourusername'}),
+            'location_city': forms.TextInput(attrs={'class': _input_class, 'placeholder': 'City'}),
+            'location_state': forms.TextInput(attrs={'class': _input_class, 'placeholder': 'State/Province'}),
+            'location_country': forms.TextInput(attrs={'class': _input_class, 'placeholder': 'Country'}),
+            'latitude': forms.NumberInput(attrs={'class': _input_class, 'step': '0.000001'}),
+            'longitude': forms.NumberInput(attrs={'class': _input_class, 'step': '0.000001'}),
+            'commute_radius': forms.NumberInput(attrs={'class': _input_class, 'placeholder': 'Miles'}),
+            'visibility': forms.Select(attrs={'class': _select_class}),
+            'show_email': forms.CheckboxInput(attrs={'class': 'rounded border-gray-300 text-indigo-600 focus:ring-indigo-500'}),
+            'account_type': forms.Select(attrs={'class': _select_class}),
+        }
 
     skills = forms.ModelMultipleChoiceField(
         queryset=Skill.objects.all(),
@@ -64,9 +86,10 @@ class JobSeekerProfileForm(forms.ModelForm):
         help_text="Select skills to associate with your profile"
     )
 
-    other_skills = forms.CharField( # New field for adding custom skills
+    other_skills = forms.CharField(
         max_length=500, 
         required=False, 
+        widget=forms.TextInput(attrs={'class': 'w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 dark:bg-gray-700 dark:text-gray-100', 'placeholder': 'e.g., Python, JavaScript, React'}),
         help_text="Comma-separated new skills not in the list"
     )
 
@@ -99,10 +122,14 @@ class JobSeekerProfileForm(forms.ModelForm):
 
 class UserProfileForm(forms.ModelForm):
     class Meta:
-        model = get_user_model() # Reverted to direct model call
+        model = get_user_model()
         fields = ['email']
         widgets = {
-            'email': forms.EmailInput(attrs={'placeholder': 'Your email address', 'required': 'true'})
+            'email': forms.EmailInput(attrs={
+                'class': 'w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 dark:bg-gray-700 dark:text-gray-100',
+                'placeholder': 'your.email@example.com',
+                'required': 'true'
+            })
         }
         labels = {
             'email': 'Email Address'

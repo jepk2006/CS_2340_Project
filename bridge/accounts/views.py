@@ -8,6 +8,7 @@ from django.contrib import messages
 from django.urls import reverse
 from django.http import JsonResponse, HttpResponse
 from django.views.decorators.http import require_POST
+from django.utils import timezone
 import csv
 from datetime import datetime
 
@@ -15,6 +16,7 @@ from .models import JobSeekerProfile, SavedSearch, TalentMessage, Conversation, 
 from .forms import SavedSearchForm, JobSeekerProfileForm, MessageForm, UserProfileForm # Added UserProfileForm
 from jobs.models import Skill, Job, Application
 from jobs.decorators import recruiter_required, admin_required
+from django.db import models # Added for models.Prefetch
 
 
 
@@ -134,6 +136,10 @@ def recruiter_talent_search(request):
             location_city = saved_search.location_city
             location_state = saved_search.location_state
             location_country = saved_search.location_country
+            
+            # Mark the saved search as checked when viewing its results
+            # This will clear the bell notification for this search
+            saved_search.mark_checked()
         except SavedSearch.DoesNotExist:
             pass
 
@@ -200,9 +206,10 @@ def recruiter_talent_search(request):
     all_skills = Skill.objects.order_by("name")
     user_saved_searches = SavedSearch.objects.filter(recruiter=request.user, is_active=True)
     
-    # Add match counts to saved searches
+    # Add match counts and new match counts to saved searches
     for search in user_saved_searches:
         search.match_count = search.get_matching_profiles().count()
+        search.new_matches_count = search.get_new_matches_since_last_check().count()
 
     context = {
         "page_obj": page_obj,
@@ -249,7 +256,8 @@ def save_search(request):
         query=query,
         location_city=location_city,
         location_state=location_state,
-        location_country=location_country
+        location_country=location_country,
+        other_skills=other_skills_raw # Save raw other skills
     )
     
     # Add skills
@@ -276,6 +284,60 @@ def save_search(request):
 
 
 @recruiter_required
+def applicant_map_data_api(request):
+    """API endpoint to provide applicant location data for mapping on the applications page."""
+    # Start with all job seeker profiles that have location data and are visible
+    profiles_query = JobSeekerProfile.objects.filter(
+        latitude__isnull=False,
+        longitude__isnull=False,
+        account_type=JobSeekerProfile.AccountType.JOB_SEEKER,
+        visibility__in=[JobSeekerProfile.Visibility.PUBLIC, JobSeekerProfile.Visibility.RECRUITERS]
+    ).select_related('user').order_by('pk')
+
+    # Filter applications based on request parameters
+    applications = Application.objects.filter(job__posted_by=request.user) # Only applications for jobs posted by the current recruiter
+
+    job_id = request.GET.get("job_id")
+    status = request.GET.get("status")
+    priority = request.GET.get("priority")
+    flagged_only = request.GET.get("flagged_only") == 'true'
+    search_query = request.GET.get("search", "").strip()
+
+    if job_id:
+        applications = applications.filter(job__id=job_id)
+    if status:
+        applications = applications.filter(status=status)
+    if priority:
+        applications = applications.filter(priority=priority)
+    if flagged_only:
+        applications = applications.filter(flagged=True)
+    if search_query:
+        applications = applications.filter(
+            Q(applicant__first_name__icontains=search_query) |
+            Q(applicant__last_name__icontains=search_query) |
+            Q(applicant__username__icontains=search_query) |
+            Q(applicant__email__icontains=search_query)
+        )
+
+    # Get the unique job seeker profiles from the filtered applications
+    filtered_profile_ids = applications.values_list('applicant__jobseeker_profile__id', flat=True).distinct()
+    profiles = profiles_query.filter(id__in=filtered_profile_ids)
+
+    results = []
+    for profile in profiles:
+        results.append({
+            'pk': profile.pk,
+            'username': profile.user.username,
+            'headline': profile.headline,
+            'latitude': float(profile.latitude),
+            'longitude': float(profile.longitude),
+            'detail_url': reverse('accounts:profile_detail_pk', args=[profile.pk])
+        })
+    
+    return JsonResponse({'results': results})
+
+
+@recruiter_required
 def saved_searches_list(request):
     """List all saved searches for the current recruiter"""
     saved_searches = SavedSearch.objects.filter(recruiter=request.user).prefetch_related('skills')
@@ -284,6 +346,9 @@ def saved_searches_list(request):
     for search in saved_searches:
         search.match_count = search.get_matching_profiles().count()
         search.new_matches_count = search.get_new_matches_since_last_check().count()
+    
+    # Don't mark as checked here - only mark individual searches as checked when viewing their matches
+    # This allows the user to see which searches have new matches on this page
     
     context = {
         'saved_searches': saved_searches,
@@ -296,6 +361,16 @@ def saved_search_detail(request, search_id):
     """View details and matches for a specific saved search"""
     saved_search = get_object_or_404(SavedSearch, id=search_id, recruiter=request.user)
     
+    # Mark the saved search as checked when its detail page is viewed
+    # Also mark all associated NEW_MATCH TalentMessages as read
+    saved_search.mark_checked()
+    TalentMessage.objects.filter(
+        recruiter=request.user,
+        saved_search=saved_search,
+        message_type=TalentMessage.MessageType.NEW_MATCH,
+        is_read=False
+    ).update(is_read=True)
+
     # Get matching profiles
     profiles = saved_search.get_matching_profiles()
     
@@ -359,21 +434,53 @@ def toggle_saved_search(request, search_id):
 
 @recruiter_required
 def talent_messages(request):
-    """View for recruiters to see messages about new talent matches"""
-    # Get all messages for the current recruiter
-    messages_list = TalentMessage.objects.filter(recruiter=request.user).select_related('saved_search', 'profile__user')
+    """View for recruiters to see messages about new talent matches, showing unique profiles."""
     
-    # Mark messages as read when viewed
-    unread_messages = messages_list.filter(is_read=False)
-    unread_messages.update(is_read=True)
+    # Get unique profile IDs that have NEW_MATCH talent messages
+    # This approach works with all databases (SQLite, PostgreSQL, MySQL)
+    profile_ids_with_matches = TalentMessage.objects.filter(
+        recruiter=request.user,
+        message_type=TalentMessage.MessageType.NEW_MATCH
+    ).values_list('profile_id', flat=True).distinct()
     
-    paginator = Paginator(messages_list, 20)
+    # Get the actual profiles with their messages
+    profiles_with_new_matches = JobSeekerProfile.objects.filter(
+        id__in=profile_ids_with_matches
+    ).annotate(
+        latest_message_date=models.Max('talentmessage__created_at')
+    ).prefetch_related(
+        models.Prefetch(
+            'talentmessage_set',
+            queryset=TalentMessage.objects.filter(
+                recruiter=request.user, 
+                message_type=TalentMessage.MessageType.NEW_MATCH
+            ).order_by('-created_at'),
+            to_attr='new_match_messages'
+        )
+    ).order_by('-latest_message_date')
+
+    # Mark all NEW_MATCH messages for these profiles as read
+    messages_marked_as_read_count = TalentMessage.objects.filter(
+        recruiter=request.user,
+        profile_id__in=profile_ids_with_matches,
+        message_type=TalentMessage.MessageType.NEW_MATCH,
+        is_read=False
+    ).update(is_read=True)
+    
+    # If any new matches were marked as read, set unread_count to 0 for immediate badge update.
+    # Otherwise, calculate the actual unread count for NEW_MATCH messages.
+    if messages_marked_as_read_count > 0:
+        unread_count = 0
+    else:
+        unread_count = TalentMessage.objects.filter(recruiter=request.user, message_type=TalentMessage.MessageType.NEW_MATCH, is_read=False).count()
+
+    paginator = Paginator(profiles_with_new_matches, 20)
     page_number = request.GET.get("page")
     page_obj = paginator.get_page(page_number)
     
     context = {
         'page_obj': page_obj,
-        'unread_count': unread_messages.count(),
+        'unread_count': unread_count,
     }
     return render(request, 'accounts/talent_messages.html', context)
 
@@ -396,8 +503,10 @@ def check_new_matches(request):
                 message_type=TalentMessage.MessageType.NEW_MATCH,
                 defaults={
                     'title': f'New match for "{saved_search.name}"',
-                    'content': f'{profile.user.username} matches your saved search criteria. '
-                              f'{"Headline: " + profile.headline if profile.headline else ""}'
+                    'content': (
+                        f'{profile.user.username if profile.user else "Unknown User"} matches your saved search criteria. '
+                        f'{"Headline: " + profile.headline if profile.headline else ""}'
+                    )
                 }
             )
             if created:
@@ -417,7 +526,7 @@ def check_new_matches(request):
 @recruiter_required
 def get_unread_messages_count(request):
     """Get count of unread messages for the current recruiter"""
-    count = TalentMessage.objects.filter(recruiter=request.user, is_read=False).count()
+    count = TalentMessage.objects.filter(recruiter=request.user, message_type=TalentMessage.MessageType.NEW_MATCH, is_read=False).count()
     return JsonResponse({'unread_count': count})
 
 
@@ -435,9 +544,43 @@ def conversations_list(request):
     if is_recruiter:
         # Recruiters see conversations they started
         conversations = Conversation.objects.filter(recruiter=request.user).select_related('candidate', 'candidate__jobseeker_profile').prefetch_related('messages')
+        
+        # Get talent notifications (new matches from saved searches)
+        # Get unique profile IDs first (works with all databases)
+        unread_profile_ids = TalentMessage.objects.filter(
+            recruiter=request.user,
+            message_type=TalentMessage.MessageType.NEW_MATCH,
+            is_read=False
+        ).values_list('profile_id', flat=True).distinct()
+        
+        # Get the actual profiles
+        talent_notifications = JobSeekerProfile.objects.filter(
+            id__in=unread_profile_ids
+        ).annotate(
+            latest_message_date=models.Max('talentmessage__created_at')
+        ).prefetch_related(
+            models.Prefetch(
+                'talentmessage_set',
+                queryset=TalentMessage.objects.filter(
+                    recruiter=request.user, 
+                    message_type=TalentMessage.MessageType.NEW_MATCH,
+                    is_read=False
+                ).select_related('saved_search').order_by('-created_at'),
+                to_attr='unread_match_messages'
+            )
+        ).order_by('-latest_message_date')
+        
+        # Mark all NEW_MATCH talent messages as read when viewing this page
+        TalentMessage.objects.filter(
+            recruiter=request.user,
+            message_type=TalentMessage.MessageType.NEW_MATCH,
+            is_read=False
+        ).update(is_read=True)
+        
     else:
         # Candidates see conversations where they are the candidate
         conversations = Conversation.objects.filter(candidate=request.user).select_related('recruiter', 'recruiter__jobseeker_profile').prefetch_related('messages')
+        talent_notifications = None
     
     # Add unread counts for each conversation
     for conversation in conversations:
@@ -447,6 +590,8 @@ def conversations_list(request):
     context = {
         'conversations': conversations,
         'is_recruiter': is_recruiter,
+        'talent_notifications': talent_notifications,
+        'unread_count': 0,  # Set to 0 since we just marked everything as read
     }
     return render(request, 'accounts/conversations_list.html', context)
 
