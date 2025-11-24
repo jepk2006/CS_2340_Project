@@ -44,32 +44,44 @@
                 <div class="bg-white dark:bg-gray-800 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
                     <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">Headline</dt>
                     <dd class="mt-1 text-sm text-gray-900 dark:text-white sm:mt-0 sm:col-span-2">
-                        {% if profile.headline %}
-                            {{ profile.headline }}
+                        {% if is_owner or not is_recruiter or profile.show_headline %}
+                            {% if profile.headline %}
+                                {{ profile.headline }}
+                            {% else %}
+                                <span class="text-gray-400 italic">Not set</span>
+                            {% endif %}
                         {% else %}
-                            <span class="text-gray-400 italic">Not set</span>
+                            <span class="text-gray-400 italic">Hidden by user</span>
                         {% endif %}
                     </dd>
                 </div>
                 <div class="bg-gray-50 dark:bg-gray-700 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
                     <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">Bio</dt>
                     <dd class="mt-1 text-sm text-gray-900 dark:text-white sm:mt-0 sm:col-span-2">
-                        {% if profile.bio %}
-                            {{ profile.bio|linebreaksbr }}
+                        {% if is_owner or not is_recruiter or profile.show_bio %}
+                            {% if profile.bio %}
+                                {{ profile.bio|linebreaksbr }}
+                            {% else %}
+                                <span class="text-gray-400 italic">Not set</span>
+                            {% endif %}
                         {% else %}
-                            <span class="text-gray-400 italic">Not set</span>
+                            <span class="text-gray-400 italic">Hidden by user</span>
                         {% endif %}
                     </dd>
                 </div>
                 <div class="bg-white dark:bg-gray-800 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
                     <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">Location</dt>
                     <dd class="mt-1 text-sm text-gray-900 dark:text-white sm:mt-0 sm:col-span-2">
-                        {% if profile.location_city or profile.location_state or profile.location_country %}
-                            {{ profile.location_city }}{% if profile.location_city and profile.location_state %}, {% endif %}
-                            {{ profile.location_state }}{% if profile.location_state and profile.location_country %}, {% endif %}
-                            {{ profile.location_country }}
+                        {% if is_owner or not is_recruiter or profile.show_location %}
+                            {% if profile.location_city or profile.location_state or profile.location_country %}
+                                {{ profile.location_city }}{% if profile.location_city and profile.location_state %}, {% endif %}
+                                {{ profile.location_state }}{% if profile.location_state and profile.location_country %}, {% endif %}
+                                {{ profile.location_country }}
+                            {% else %}
+                                <span class="text-gray-400 italic">Not set</span>
+                            {% endif %}
                         {% else %}
-                            <span class="text-gray-400 italic">Not set</span>
+                            <span class="text-gray-400 italic">Hidden by user</span>
                         {% endif %}
                     </dd>
                 </div>
@@ -98,16 +110,20 @@
             <h3 class="text-lg leading-6 font-medium text-gray-900 dark:text-white">Skills</h3>
         </div>
         <div class="border-t border-gray-200 dark:border-gray-700 px-4 py-5 sm:px-6">
-            {% if profile.skills.all %}
-                <div class="flex flex-wrap gap-2">
-                    {% for skill in profile.skills.all %}
-                        <span class="inline-flex items-center px-3 py-0.5 rounded-full text-sm font-medium bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-200">
-                            {{ skill.name }}
-                        </span>
-                    {% endfor %}
-                </div>
+            {% if is_owner or not is_recruiter or profile.show_skills %}
+                {% if profile.skills.all %}
+                    <div class="flex flex-wrap gap-2">
+                        {% for skill in profile.skills.all %}
+                            <span class="inline-flex items-center px-3 py-0.5 rounded-full text-sm font-medium bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-200">
+                                {{ skill.name }}
+                            </span>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <p class="text-gray-400 italic">No skills added yet</p>
+                {% endif %}
             {% else %}
-                <p class="text-gray-400 italic">No skills added yet</p>
+                <p class="text-gray-400 italic">Hidden by user</p>
             {% endif %}
         </div>
     </div>
@@ -120,20 +136,28 @@
             <div class="bg-gray-50 dark:bg-gray-700 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
                 <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">Education</dt>
                 <dd class="mt-1 text-sm text-gray-900 dark:text-white sm:mt-0 sm:col-span-2">
-                    {% if profile.education %}
-                        {{ profile.education|linebreaksbr }}
+                    {% if is_owner or not is_recruiter or profile.show_education %}
+                        {% if profile.education %}
+                            {{ profile.education|linebreaksbr }}
+                        {% else %}
+                            <span class="text-gray-400 italic">Not set</span>
+                        {% endif %}
                     {% else %}
-                        <span class="text-gray-400 italic">Not set</span>
+                        <span class="text-gray-400 italic">Hidden by user</span>
                     {% endif %}
                 </dd>
             </div>
             <div class="bg-white dark:bg-gray-800 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
                 <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">Experience</dt>
                 <dd class="mt-1 text-sm text-gray-900 dark:text-white sm:mt-0 sm:col-span-2">
-                    {% if profile.experience %}
-                        {{ profile.experience|linebreaksbr }}
+                    {% if is_owner or not is_recruiter or profile.show_experience %}
+                        {% if profile.experience %}
+                            {{ profile.experience|linebreaksbr }}
+                        {% else %}
+                            <span class="text-gray-400 italic">Not set</span>
+                        {% endif %}
                     {% else %}
-                        <span class="text-gray-400 italic">Not set</span>
+                        <span class="text-gray-400 italic">Hidden by user</span>
                     {% endif %}
                 </dd>
             </div>
@@ -148,30 +172,42 @@
             <div class="bg-gray-50 dark:bg-gray-700 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
                 <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">Portfolio</dt>
                 <dd class="mt-1 text-sm text-gray-900 dark:text-white sm:mt-0 sm:col-span-2">
-                    {% if profile.portfolio_url %}
-                        <a href="{{ profile.portfolio_url }}" target="_blank" class="text-indigo-600 hover:text-indigo-800">{{ profile.portfolio_url }}</a>
+                    {% if is_owner or not is_recruiter or profile.show_portfolio %}
+                        {% if profile.portfolio_url %}
+                            <a href="{{ profile.portfolio_url }}" target="_blank" class="text-indigo-600 hover:text-indigo-800">{{ profile.portfolio_url }}</a>
+                        {% else %}
+                            <span class="text-gray-400 italic">Not set</span>
+                        {% endif %}
                     {% else %}
-                        <span class="text-gray-400 italic">Not set</span>
+                        <span class="text-gray-400 italic">Hidden by user</span>
                     {% endif %}
                 </dd>
             </div>
             <div class="bg-white dark:bg-gray-800 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
                 <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">LinkedIn</dt>
                 <dd class="mt-1 text-sm text-gray-900 dark:text-white sm:mt-0 sm:col-span-2">
-                    {% if profile.linkedin_url %}
-                        <a href="{{ profile.linkedin_url }}" target="_blank" class="text-indigo-600 hover:text-indigo-800">{{ profile.linkedin_url }}</a>
+                    {% if is_owner or not is_recruiter or profile.show_linkedin %}
+                        {% if profile.linkedin_url %}
+                            <a href="{{ profile.linkedin_url }}" target="_blank" class="text-indigo-600 hover:text-indigo-800">{{ profile.linkedin_url }}</a>
+                        {% else %}
+                            <span class="text-gray-400 italic">Not set</span>
+                        {% endif %}
                     {% else %}
-                        <span class="text-gray-400 italic">Not set</span>
+                        <span class="text-gray-400 italic">Hidden by user</span>
                     {% endif %}
                 </dd>
             </div>
             <div class="bg-gray-50 dark:bg-gray-700 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
                 <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">GitHub</dt>
                 <dd class="mt-1 text-sm text-gray-900 dark:text-white sm:mt-0 sm:col-span-2">
-                    {% if profile.github_url %}
-                        <a href="{{ profile.github_url }}" target="_blank" class="text-indigo-600 hover:text-indigo-800">{{ profile.github_url }}</a>
+                    {% if is_owner or not is_recruiter or profile.show_github %}
+                        {% if profile.github_url %}
+                            <a href="{{ profile.github_url }}" target="_blank" class="text-indigo-600 hover:text-indigo-800">{{ profile.github_url }}</a>
+                        {% else %}
+                            <span class="text-gray-400 italic">Not set</span>
+                        {% endif %}
                     {% else %}
-                        <span class="text-gray-400 italic">Not set</span>
+                        <span class="text-gray-400 italic">Hidden by user</span>
                     {% endif %}
                 </dd>
             </div>
