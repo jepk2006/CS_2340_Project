@@ -35,15 +35,10 @@ def profile_detail(request, pk=None):
             messages.warning(request, "Please add an email address to your profile.")
             return redirect("accounts:profile_edit") # Redirect to the edit view (name is profile_edit, view is profile_update)
 
-    # Check if user wants to preview as recruiter
-    preview_as_recruiter = request.GET.get('preview_as_recruiter') == 'true'
-    is_owner = request.user == profile.user
-    
     context = {
         "profile": profile,
-        "is_owner": is_owner,
-        "is_recruiter": hasattr(request.user, 'jobseeker_profile') and request.user.jobseeker_profile.account_type == JobSeekerProfile.AccountType.RECRUITER if request.user.is_authenticated else False,
-        "preview_as_recruiter": preview_as_recruiter and is_owner,  # Only allow preview if viewing own profile
+        "is_owner": request.user == profile.user,
+        "is_recruiter": hasattr(request.user, 'jobseeker_profile') and request.user.jobseeker_profile.account_type == JobSeekerProfile.AccountType.RECRUITER if request.user.is_authenticated else False
     }
     return render(request, "accounts/profile_detail.html", context)
 

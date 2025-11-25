@@ -57,23 +57,11 @@ class JobSeekerProfileForm(forms.ModelForm):
             "skills",
             "visibility",
             "show_email",
-            # Granular privacy settings
-            "show_headline",
-            "show_bio",
-            "show_education",
-            "show_experience",
-            "show_location",
-            "show_skills",
-            "show_portfolio",
-            "show_linkedin",
-            "show_github",
             "account_type",
         ]
         _input_class = 'w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 dark:bg-gray-700 dark:text-gray-100'
         _textarea_class = 'w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 dark:bg-gray-700 dark:text-gray-100'
         _select_class = 'w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 dark:bg-gray-700 dark:text-gray-100'
-        
-        _checkbox_class = 'rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 dark:bg-gray-700 dark:border-gray-600'
         
         widgets = {
             'headline': forms.TextInput(attrs={'class': _input_class, 'placeholder': 'e.g., Senior Software Engineer'}),
@@ -88,16 +76,7 @@ class JobSeekerProfileForm(forms.ModelForm):
             'location_country': forms.TextInput(attrs={'class': _input_class, 'placeholder': 'e.g., USA or United States'}),
             'commute_radius': forms.NumberInput(attrs={'class': _input_class, 'placeholder': 'Miles'}),
             'visibility': forms.Select(attrs={'class': _select_class}),
-            'show_email': forms.CheckboxInput(attrs={'class': _checkbox_class}),
-            'show_headline': forms.CheckboxInput(attrs={'class': _checkbox_class}),
-            'show_bio': forms.CheckboxInput(attrs={'class': _checkbox_class}),
-            'show_education': forms.CheckboxInput(attrs={'class': _checkbox_class}),
-            'show_experience': forms.CheckboxInput(attrs={'class': _checkbox_class}),
-            'show_location': forms.CheckboxInput(attrs={'class': _checkbox_class}),
-            'show_skills': forms.CheckboxInput(attrs={'class': _checkbox_class}),
-            'show_portfolio': forms.CheckboxInput(attrs={'class': _checkbox_class}),
-            'show_linkedin': forms.CheckboxInput(attrs={'class': _checkbox_class}),
-            'show_github': forms.CheckboxInput(attrs={'class': _checkbox_class}),
+            'show_email': forms.CheckboxInput(attrs={'class': 'rounded border-gray-300 text-indigo-600 focus:ring-indigo-500'}),
             'account_type': forms.Select(attrs={'class': _select_class}),
         }
 

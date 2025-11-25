@@ -40,18 +40,6 @@ class JobSeekerProfile(models.Model):
     # Privacy
     visibility = models.CharField(max_length=20, choices=Visibility.choices, default=Visibility.PUBLIC)
     show_email = models.BooleanField(default=False)
-    
-    # Granular Privacy Settings - control what recruiters can see
-    show_headline = models.BooleanField(default=True, help_text="Show headline to recruiters")
-    show_bio = models.BooleanField(default=True, help_text="Show bio to recruiters")
-    show_education = models.BooleanField(default=True, help_text="Show education to recruiters")
-    show_experience = models.BooleanField(default=True, help_text="Show experience to recruiters")
-    show_location = models.BooleanField(default=True, help_text="Show location to recruiters")
-    show_skills = models.BooleanField(default=True, help_text="Show skills to recruiters")
-    show_portfolio = models.BooleanField(default=True, help_text="Show portfolio URL to recruiters")
-    show_linkedin = models.BooleanField(default=True, help_text="Show LinkedIn URL to recruiters")
-    show_github = models.BooleanField(default=True, help_text="Show GitHub URL to recruiters")
-    
     account_type = models.CharField(max_length=20, choices=AccountType.choices, default=AccountType.JOB_SEEKER)
 
     updated_at = models.DateTimeField(auto_now=True)
